@@ -1,0 +1,875 @@
+<title>Mein Tag</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: glasige Kopfzeile mit großem Titel, darunter drei Kurzinfo-Widgets und drei Karten (Kalender · Mail · Aufgaben) im Raster */
+:root {
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --glass: rgba(245, 245, 247, 0.72);
+  --label: #1d1d1f;
+  --label-2: rgba(60, 60, 67, 0.62);
+  --label-3: rgba(60, 60, 67, 0.32);
+  --fill: rgba(118, 118, 128, 0.12);
+  --fill-2: rgba(118, 118, 128, 0.08);
+  --sep: rgba(60, 60, 67, 0.13);
+  --seg-on: #ffffff;
+  --blue: #007aff;
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --green: #34c759;
+  --mono-a: #a7acb6;
+  --mono-b: #868a94;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.05);
+  --skel: rgba(118, 118, 128, 0.14);
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 22px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000; --card: #1c1c1e; --glass: rgba(0, 0, 0, 0.62);
+    --label: #f5f5f7; --label-2: rgba(235, 235, 245, 0.6); --label-3: rgba(235, 235, 245, 0.3);
+    --fill: rgba(118, 118, 128, 0.24); --fill-2: rgba(118, 118, 128, 0.16); --sep: rgba(84, 84, 88, 0.55);
+    --seg-on: #636366; --blue: #0a84ff; --red: #ff453a; --orange: #ff9f0a; --green: #30d158;
+    --mono-a: #6e7280; --mono-b: #50535c; --shadow: none; --skel: rgba(118, 118, 128, 0.22);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --card: #1c1c1e; --glass: rgba(0, 0, 0, 0.62);
+  --label: #f5f5f7; --label-2: rgba(235, 235, 245, 0.6); --label-3: rgba(235, 235, 245, 0.3);
+  --fill: rgba(118, 118, 128, 0.24); --fill-2: rgba(118, 118, 128, 0.16); --sep: rgba(84, 84, 88, 0.55);
+  --seg-on: #636366; --blue: #0a84ff; --red: #ff453a; --orange: #ff9f0a; --green: #30d158;
+  --mono-a: #6e7280; --mono-b: #50535c; --shadow: none; --skel: rgba(118, 118, 128, 0.22);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--label);
+  font-family: var(--font); font-size: 15px; line-height: 1.4;
+  -webkit-font-smoothing: antialiased; letter-spacing: -0.005em;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--glass);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 45%, transparent); outline-offset: 2px; border-radius: 10px; }
+
+.wrap {
+  max-width: 1280px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Kopfzeile */
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--glass);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--sep);
+}
+.top .wrap { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-block: 18px 14px; }
+.eyebrow { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--label-2); }
+h1 {
+  font-family: var(--font-display); font-size: clamp(28px, 4.2vw, 36px); font-weight: 700;
+  letter-spacing: -0.025em; line-height: 1.1; margin: 2px 0 0; text-wrap: balance;
+}
+.top-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.updated { font-size: 13px; color: var(--label-2); font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .updated { display: none; } }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--fill); color: var(--blue); transition: background .15s;
+}
+.icon-btn:hover { background: color-mix(in srgb, var(--fill) 100%, var(--blue) 12%); }
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn.spin svg { animation: spin .8s linear; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+main { padding-block: 22px 48px; display: grid; gap: 20px; }
+
+/* Kurzinfo-Widgets */
+.glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.widget {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 16px 18px; display: grid; gap: 4px; min-width: 0;
+}
+.widget-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.widget-head .dot { width: 8px; height: 8px; border-radius: 50%; }
+.widget-big {
+  font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em;
+  line-height: 1.15; font-variant-numeric: tabular-nums;
+}
+.widget-title { font-size: 19px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.widget-sub { font-size: 14px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  background: color-mix(in srgb, var(--chip, var(--blue)) 14%, transparent); color: var(--chip, var(--blue));
+}
+
+/* Karten */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 20px; align-items: start; }
+@media (max-width: 420px) { .cards { grid-template-columns: 1fr; } }
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); min-width: 0; overflow: hidden; }
+.card-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px 10px; flex-wrap: wrap; }
+.card-head .seg { margin-left: auto; }
+.app-icon {
+  width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.08);
+}
+.app-icon svg { width: 18px; height: 18px; }
+.app-icon.cal { background: #ffffff; color: #ff3b30; }
+.app-icon.mail { background: linear-gradient(180deg, #1fa2ff, #0a6cff); color: #fff; }
+.app-icon.todo { background: linear-gradient(180deg, #ffb340, #ff8a00); color: #fff; }
+.card-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.card-meta { font-size: 13px; color: var(--label-2); }
+.card-head .grow { flex: 1; min-width: 0; }
+.card-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 18px 14px; font-size: 13px; color: var(--label-2);
+}
+.card-foot a { color: var(--blue); font-weight: 500; }
+.card-foot a:hover { text-decoration: underline; }
+
+/* Listen im iOS-Stil mit eingerückten Trennlinien */
+.list { list-style: none; margin: 0; padding: 0 0 4px; }
+.row { position: relative; display: flex; gap: 12px; padding: 10px 18px; align-items: flex-start; }
+.row + .row::before {
+  content: ""; position: absolute; top: 0; right: 0; left: var(--inset, 18px);
+  border-top: 0.5px solid var(--sep);
+}
+a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
+.row-main { flex: 1; min-width: 0; }
+.row-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-sub { color: var(--label-2); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-side { font-size: 13px; color: var(--label-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Kalender */
+.day { padding: 12px 18px 4px; font-size: 13px; font-weight: 600; color: var(--label-2); display: flex; gap: 8px; align-items: baseline; }
+.day.today { color: var(--red); }
+.day .count { font-weight: 400; color: var(--label-3); }
+.ev { --inset: 86px; }
+.ev-time { width: 52px; flex-shrink: 0; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; line-height: 1.35; padding-top: 1px; }
+.ev-time .end { color: var(--label-2); }
+.ev-bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--ev, var(--blue)); flex-shrink: 0; }
+.ev.now .ev-title::after { content: "Jetzt"; margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: .04em; vertical-align: 1px; }
+
+/* Mail */
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--fill); border-radius: 9px; padding: 2px; }
+.seg button { font-size: 13px; font-weight: 500; padding: 4px 12px; border-radius: 7px; white-space: nowrap; }
+.seg button[aria-selected="true"] { background: var(--seg-on); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 0 0.5px rgba(0,0,0,.04); }
+.mail { --inset: 70px; }
+.mono {
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
+  background: linear-gradient(180deg, var(--mono-a), var(--mono-b)); color: #fff; font-size: 15px; font-weight: 600; letter-spacing: .01em;
+}
+.mail-top { display: flex; gap: 8px; align-items: baseline; }
+.mail-top .row-title { flex: 1; }
+.unread-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue); flex-shrink: 0; margin-top: 15px; margin-left: -4px; margin-right: -6px; }
+.unread-dot.off { background: transparent; }
+.mail .subject { color: var(--label); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail.read .row-title { font-weight: 500; }
+.mail .snippet { color: var(--label-2); font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Aufgaben */
+.add { display: flex; gap: 8px; align-items: center; padding: 4px 18px 10px; }
+.add input[type="text"] {
+  flex: 1 1 auto; min-width: 0; font: inherit; color: var(--label); background: var(--fill);
+  border: 0; border-radius: 10px; padding: 8px 12px;
+}
+.add input[type="date"] {
+  font: inherit; font-size: 14px; color: var(--label-2); background: var(--fill);
+  border: 0; border-radius: 10px; padding: 7px 8px; min-width: 0; flex: 0 1 140px;
+}
+.add input::placeholder { color: var(--label-3); }
+.add .btn {
+  background: var(--blue); color: #fff; width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
+}
+.add .btn svg { width: 16px; height: 16px; }
+.add .btn:disabled { opacity: .4; cursor: default; }
+.task { --inset: 52px; align-items: center; }
+.check {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--label-3); display: grid; place-items: center; transition: background .15s, border-color .15s;
+}
+.check svg { width: 12px; height: 12px; opacity: 0; color: #fff; }
+.check:hover { border-color: var(--orange); }
+.check[aria-checked="true"] { background: var(--orange); border-color: var(--orange); }
+.check[aria-checked="true"] svg { opacity: 1; }
+.task.done .row-title { color: var(--label-2); font-weight: 400; text-decoration: line-through; text-decoration-color: var(--label-3); }
+.task .row-title { font-weight: 400; white-space: normal; overflow-wrap: anywhere; }
+.due { font-size: 13px; color: var(--label-2); }
+.due.over { color: var(--red); }
+.due.today { color: var(--orange); }
+.del { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--label-3); opacity: 0; transition: opacity .15s; }
+.del svg { width: 14px; height: 14px; }
+.task:hover .del, .del:focus-visible { opacity: 1; }
+.del:hover { color: var(--red); background: var(--fill-2); }
+@media (hover: none) { .del { opacity: 1; } }
+.done-toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; font-size: 14px; color: var(--label-2); border-top: 0.5px solid var(--sep); }
+.done-toggle button { color: var(--blue); font-weight: 500; }
+.link-btn { color: var(--blue); font-weight: 500; }
+
+/* Zustände */
+.empty { padding: 22px 18px 26px; text-align: center; color: var(--label-2); font-size: 14px; display: grid; gap: 4px; }
+.empty strong { color: var(--label); font-size: 15px; font-weight: 600; }
+.notice {
+  margin: 4px 18px 12px; padding: 12px 14px; border-radius: 14px; font-size: 14px;
+  background: color-mix(in srgb, var(--orange) 12%, transparent); color: var(--label);
+  display: grid; gap: 8px; justify-items: start;
+}
+.notice.soft { background: var(--fill-2); color: var(--label-2); }
+.notice button { background: var(--blue); color: #fff; font-weight: 600; font-size: 13px; padding: 6px 12px; border-radius: 999px; }
+.skel { display: grid; gap: 14px; padding: 12px 18px 20px; }
+.skel span { display: block; height: 12px; border-radius: 6px; background: var(--skel); animation: pulse 1.4s ease-in-out infinite; }
+.skel span:nth-child(3n+1) { width: 70%; } .skel span:nth-child(3n+2) { width: 92%; } .skel span:nth-child(3n) { width: 55%; }
+@keyframes pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .skel span, .icon-btn.spin svg { animation: none; } * { transition: none !important; } }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow" id="today-label">Heute</div>
+      <h1 id="greeting">Guten Tag</h1>
+    </div>
+    <div class="top-actions">
+      <span class="updated" id="updated"></span>
+      <button class="icon-btn" id="refresh" type="button" aria-label="Aktualisieren" title="Aktualisieren">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="glance" aria-label="Auf einen Blick">
+    <div class="widget" id="w-next"></div>
+    <div class="widget" id="w-mail"></div>
+    <div class="widget" id="w-tasks"></div>
+  </section>
+
+  <section class="cards">
+    <article class="card" aria-labelledby="cal-title">
+      <div class="card-head">
+        <div class="app-icon cal" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+        </div>
+        <div class="grow">
+          <div class="card-title" id="cal-title">Kalender</div>
+          <div class="card-meta">Die nächsten 14 Tage</div>
+        </div>
+      </div>
+      <div id="cal-body"></div>
+      <div class="card-foot">
+        <span id="cal-fresh"></span>
+        <a href="https://calendar.google.com/calendar/r/agenda" target="_blank" rel="noopener">In Google Kalender öffnen</a>
+      </div>
+    </article>
+
+    <article class="card" aria-labelledby="mail-title">
+      <div class="card-head">
+        <div class="app-icon mail" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>
+        </div>
+        <div class="grow">
+          <div class="card-title" id="mail-title">Mail</div>
+          <div class="card-meta" id="mail-meta">Posteingang</div>
+        </div>
+        <div class="seg" role="tablist" aria-label="Mail-Ansicht">
+          <button type="button" role="tab" id="tab-unread" data-tab="unread" aria-selected="true">Ungelesen</button>
+          <button type="button" role="tab" id="tab-inbox" data-tab="inbox" aria-selected="false">Alle</button>
+        </div>
+      </div>
+      <div id="mail-body"></div>
+      <div class="card-foot">
+        <span id="mail-fresh"></span>
+        <a href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">In Gmail öffnen</a>
+      </div>
+    </article>
+
+    <article class="card" aria-labelledby="todo-title">
+      <div class="card-head">
+        <div class="app-icon todo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 7h10M10 12h10M10 17h10"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="5" cy="17" r="1.2" fill="currentColor"/></svg>
+        </div>
+        <div class="grow">
+          <div class="card-title" id="todo-title">Aufgaben</div>
+          <div class="card-meta" id="todo-meta">Nur für dich sichtbar</div>
+        </div>
+      </div>
+      <form class="add" id="add-form" autocomplete="off">
+        <label class="sr" for="task-title">Neue Aufgabe</label>
+        <input type="text" id="task-title" placeholder="Neue Aufgabe" maxlength="200">
+        <label class="sr" for="task-due">Fällig am</label>
+        <input type="date" id="task-due" title="Fällig am (optional)">
+        <button class="btn" type="submit" id="task-add" disabled aria-label="Aufgabe hinzufügen" title="Hinzufügen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      </form>
+      <div id="todo-body"></div>
+    </article>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const GMAIL = "Gmail";
+  const GCAL = "Google Calendar";
+  const $ = (s) => document.querySelector(s);
+  const use = (name) =>
+    window.claude && typeof window.claude.use === "function"
+      ? window.claude.use(name).catch(() => null)
+      : Promise.resolve(null);
+
+  const state = {
+    events: null, calErr: null, calAt: null,
+    inbox: null, unread: null, unreadTotal: null, mailErr: null, mailAt: null,
+    mailTab: "unread",
+    tasks: null, tasksErr: null, tasksReadOnly: false, showDone: false,
+  };
+  try { const t = localStorage.getItem("mailTab"); if (t === "inbox" || t === "unread") state.mailTab = t; } catch (e) {}
+
+  let mcp = null;
+  let tasksCol = null;
+  const watches = {};
+
+  // ---------- Hilfsfunktionen ----------
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = (n) => String(n).padStart(2, "0");
+  const localISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+  const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const dayDiff = (a, b) => Math.round((startOfDay(a) - startOfDay(b)) / 86400000);
+  const fmtTime = (d) => d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const fmtNum = (n) => Number(n).toLocaleString("de-DE");
+  const isValid = (d) => d instanceof Date && !isNaN(d);
+
+  function dayLabel(d, now = new Date()) {
+    const diff = dayDiff(d, now);
+    if (diff === 0) return "Heute";
+    if (diff === 1) return "Morgen";
+    return d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
+  }
+  function shortDay(d, now = new Date()) {
+    const diff = dayDiff(d, now);
+    if (diff === 0) return "Heute";
+    if (diff === 1) return "Morgen";
+    if (diff === -1) return "Gestern";
+    return d.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" });
+  }
+
+  const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+  const SKELETON = '<div class="skel" aria-label="Lädt"><span></span><span></span><span></span><span></span><span></span></div>';
+
+  // ---------- Fehler je Konnektor ----------
+  function errorInfo(err, server) {
+    const code = err && err.code;
+    switch (code) {
+      case "needs_reauth":
+        return { retract: true, text: `Die Verbindung zu ${server} ist abgelaufen. Verbinde ${server} neu unter claude.ai → Einstellungen → Konnektoren.` };
+      case "server_not_connected":
+      case "server_not_found":
+        return { retract: true, text: `${server} ist nicht verbunden. Füge den Konnektor unter claude.ai → Einstellungen → Konnektoren hinzu.` };
+      case "selection_required":
+        return { retract: true, text: `Du hast mehrere ${server}-Konnektoren. Wähle in claude.ai aus, welcher hier genutzt werden soll.` };
+      case "approval_required":
+        return { retract: true, text: `Diese Seite braucht deine Erlaubnis, um ${server} zu lesen.`, action: "approve" };
+      case "not_in_manifest":
+      case "consent_required":
+        return { retract: true, text: `Der Zugriff auf ${server} ist für diese Seite ausgeschaltet.`, action: "manage" };
+      case "blocked_by_policy":
+        return { retract: true, text: `Deine Organisation erlaubt ${server} hier nicht.` };
+      case "not_granted":
+      case "capability_disabled":
+      case "capability_removed":
+        return { retract: true, text: "Konnektoren sind in dieser Ansicht nicht verfügbar. Öffne die Seite in claude.ai." };
+      case "tool_error":
+        return { retract: false, text: `${server} hat die Anfrage abgelehnt. Versuch es mit „Aktualisieren“ erneut.` };
+      default:
+        return { retract: false, transient: true, text: `${server} ist gerade nicht erreichbar. Die Seite versucht es automatisch erneut.` };
+    }
+  }
+
+  function noticeHTML(info, server) {
+    if (!info) return "";
+    let btn = "";
+    if (info.action === "approve") btn = `<button type="button" data-approve="${esc(server)}">Zugriff erlauben</button>`;
+    if (info.action === "manage") btn = `<button type="button" data-manage="1">Berechtigungen verwalten</button>`;
+    return `<div class="notice${info.transient ? " soft" : ""}" role="status"><span>${esc(info.text)}</span>${btn}</div>`;
+  }
+
+  function freshText(ts) {
+    return ts ? `Stand ${fmtTime(new Date(ts))} Uhr` : "";
+  }
+
+  // ---------- Kalender ----------
+  const GCOLORS = { 1: "#7986cb", 2: "#33b679", 3: "#8e24aa", 4: "#e67c73", 5: "#f6bf26", 6: "#f4511e", 7: "#039be5", 8: "#8a8a8e", 9: "#3f51b5", 10: "#0b8043", 11: "#d50000" };
+
+  function parseEvent(e) {
+    const allDay = !!(e.start && e.start.date && !e.start.dateTime);
+    const start = allDay ? new Date(e.start.date + "T00:00:00") : new Date(e.start && e.start.dateTime);
+    const endRaw = allDay ? (e.end && e.end.date) || e.start.date : (e.end && e.end.dateTime) || (e.start && e.start.dateTime);
+    const end = allDay ? new Date(endRaw + "T00:00:00") : new Date(endRaw);
+    return {
+      id: e.id, title: e.summary || "(Ohne Titel)", start, end, allDay,
+      location: e.location || "", link: e.htmlLink || "", status: e.status,
+      color: GCOLORS[e.colorId] || "",
+    };
+  }
+
+  function upcomingEvents(now = new Date()) {
+    if (!state.events) return null;
+    return state.events
+      .filter((e) => e.status !== "cancelled" && isValid(e.start) && (e.end > now || (e.allDay && dayKey(e.start) === dayKey(now))))
+      .sort((a, b) => a.start - b.start || (b.allDay - a.allDay));
+  }
+
+  function renderCal() {
+    const body = $("#cal-body");
+    $("#cal-fresh").textContent = state.events ? freshText(state.calAt) : "";
+    const notice = noticeHTML(state.calErr, GCAL);
+    const list = upcomingEvents();
+    if (!list) { body.innerHTML = notice || SKELETON; return; }
+    if (!list.length) {
+      body.innerHTML = notice + '<div class="empty"><strong>Keine Termine</strong>In den nächsten 14 Tagen ist nichts eingetragen.</div>';
+      return;
+    }
+    const now = new Date();
+    const groups = new Map();
+    for (const ev of list.slice(0, 30)) {
+      const anchor = ev.start < startOfDay(now) ? startOfDay(now) : ev.start;
+      const k = dayKey(anchor);
+      if (!groups.has(k)) groups.set(k, { date: anchor, items: [] });
+      groups.get(k).items.push(ev);
+    }
+    let html = notice;
+    for (const { date, items } of groups.values()) {
+      const isToday = dayDiff(date, now) === 0;
+      html += `<div class="day${isToday ? " today" : ""}">${esc(dayLabel(date, now))}<span class="count">${items.length} ${items.length === 1 ? "Termin" : "Termine"}</span></div><ul class="list">`;
+      for (const ev of items) {
+        const running = !ev.allDay && ev.start <= now && ev.end > now;
+        const time = ev.allDay
+          ? '<div class="end">ganz&shy;tägig</div>'
+          : `<div>${fmtTime(ev.start)}</div><div class="end">${fmtTime(ev.end)}</div>`;
+        const tag = ev.link ? "a" : "div";
+        const href = ev.link ? ` href="${esc(ev.link)}" target="_blank" rel="noopener"` : "";
+        html += `<li><${tag} class="row ev${running ? " now" : ""}"${href}${ev.color ? ` style="--ev:${ev.color}"` : ""}>
+          <div class="ev-time">${time}</div>
+          <div class="ev-bar"></div>
+          <div class="row-main">
+            <div class="row-title ev-title">${esc(ev.title)}</div>
+            ${ev.location ? `<div class="row-sub">${esc(ev.location)}</div>` : ""}
+          </div>
+        </${tag}></li>`;
+      }
+      html += "</ul>";
+    }
+    body.innerHTML = html;
+  }
+
+  function relTo(ev, now) {
+    if (ev.allDay) return dayDiff(ev.start, now) <= 0 ? "Heute" : shortDay(ev.start, now);
+    if (ev.start <= now) return "Läuft gerade";
+    const mins = Math.round((ev.start - now) / 60000);
+    if (mins < 60) return `in ${mins} Min.`;
+    const days = dayDiff(ev.start, now);
+    if (days === 0) return `in ${Math.round(mins / 60)} Std.`;
+    if (days === 1) return "Morgen";
+    return `in ${days} Tagen`;
+  }
+
+  function renderNextWidget() {
+    const el = $("#w-next");
+    const head = '<div class="widget-head"><span class="dot" style="background:var(--red)"></span>Nächster Termin</div>';
+    const list = upcomingEvents();
+    if (!list) {
+      el.innerHTML = head + `<div class="widget-sub">${state.calErr ? esc(state.calErr.retract ? "Kalender nicht verfügbar" : "Lädt …") : "Lädt …"}</div>`;
+      return;
+    }
+    const now = new Date();
+    const ev = list.find((e) => !e.allDay) || list[0];
+    if (!ev) { el.innerHTML = head + '<div class="widget-title">Frei</div><div class="widget-sub">Keine Termine in den nächsten 14 Tagen</div>'; return; }
+    const when = ev.allDay ? `${shortDay(ev.start, now)}, ganztägig` : `${shortDay(ev.start, now)}, ${fmtTime(ev.start)}–${fmtTime(ev.end)}`;
+    const rel = relTo(ev, now);
+    const chipColor = rel === "Läuft gerade" || rel.startsWith("in ") && rel.includes("Min") ? "var(--red)" : "var(--blue)";
+    el.innerHTML = head + `<div class="widget-title">${esc(ev.title)}</div>
+      <div style="display:flex;gap:8px;align-items:center;min-width:0"><span class="widget-sub">${esc(when)}</span><span class="chip" style="--chip:${chipColor}">${esc(rel)}</span></div>`;
+  }
+
+  // ---------- Mail ----------
+  function parseSender(raw) {
+    const s = String(raw || "").trim();
+    const m = s.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+    const name = m && m[1].trim() ? m[1].trim() : "";
+    const addr = m ? m[2].trim() : s;
+    const display = name || addr || "Unbekannt";
+    const basis = name || addr.split("@")[0] || "?";
+    const parts = basis.replace(/[^\p{L}\p{N}\s._-]/gu, "").split(/[\s._-]+/).filter(Boolean);
+    const initials = ((parts[0] || "?")[0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+    return { display, initials };
+  }
+
+  function mailDate(raw, now = new Date()) {
+    if (!raw) return "";
+    const d = new Date(/^\d+$/.test(String(raw)) ? Number(raw) : raw);
+    if (!isValid(d)) return "";
+    const diff = dayDiff(d, now);
+    if (diff === 0) return fmtTime(d);
+    if (diff === -1) return "Gestern";
+    if (diff > -7) return d.toLocaleDateString("de-DE", { weekday: "short" });
+    return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  }
+
+  function threadToRow(t, unreadIds) {
+    const msgs = Array.isArray(t.messages) ? t.messages : [];
+    const first = msgs[0] || {};
+    const last = msgs[msgs.length - 1] || first;
+    const labels = last.labelIds || last.label_ids || [];
+    return {
+      id: t.id,
+      subject: first.subject || last.subject || "(Kein Betreff)",
+      sender: parseSender(last.sender || first.sender),
+      snippet: last.snippet || t.snippet || "",
+      date: mailDate(last.date),
+      count: t.messageCount || msgs.length,
+      unread: unreadIds.has(t.id) || labels.includes("UNREAD"),
+      url: t.viewUrl || last.viewUrl || `https://mail.google.com/mail/u/0/#inbox/${encodeURIComponent(t.id)}`,
+    };
+  }
+
+  function renderMail() {
+    const body = $("#mail-body");
+    for (const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-selected", String(b.dataset.tab === state.mailTab));
+    const loaded = state.unread !== null || state.inbox !== null;
+    $("#mail-fresh").textContent = loaded ? freshText(state.mailAt) : "";
+    $("#mail-meta").textContent = state.unreadTotal != null ? `${fmtNum(state.unreadTotal)} ungelesen` : "Posteingang";
+    const notice = noticeHTML(state.mailErr, GMAIL);
+    const source = state.mailTab === "unread" ? state.unread : state.inbox;
+    if (!source) { body.innerHTML = notice || SKELETON; return; }
+    if (!source.length) {
+      body.innerHTML = notice + (state.mailTab === "unread"
+        ? '<div class="empty"><strong>Alles gelesen</strong>Im Posteingang wartet keine ungelesene Mail.</div>'
+        : '<div class="empty"><strong>Posteingang leer</strong>Hier ist gerade nichts.</div>');
+      return;
+    }
+    const unreadIds = new Set((state.unread || []).map((t) => t.id));
+    let html = notice + '<ul class="list">';
+    for (const t of source.slice(0, 12)) {
+      const r = threadToRow(t, unreadIds);
+      html += `<li><a class="row mail${r.unread ? "" : " read"}" href="${esc(r.url)}" target="_blank" rel="noopener">
+        <span class="unread-dot${r.unread ? "" : " off"}" aria-label="${r.unread ? "Ungelesen" : ""}"></span>
+        <span class="mono" aria-hidden="true">${esc(r.sender.initials)}</span>
+        <div class="row-main">
+          <div class="mail-top"><div class="row-title">${esc(r.sender.display)}</div>${r.date ? `<span class="row-side">${esc(r.date)}</span>` : ""}</div>
+          <div class="subject">${esc(r.subject)}${r.count > 1 ? ` <span class="row-side">· ${r.count}</span>` : ""}</div>
+          ${r.snippet ? `<div class="snippet">${esc(r.snippet)}</div>` : ""}
+        </div>
+      </a></li>`;
+    }
+    body.innerHTML = html + "</ul>";
+  }
+
+  function renderMailWidget() {
+    const el = $("#w-mail");
+    const head = '<div class="widget-head"><span class="dot" style="background:var(--blue)"></span>Mail</div>';
+    if (state.unreadTotal == null) {
+      const msg = state.mailErr && state.mailErr.retract ? "Gmail nicht verfügbar" : "Lädt …";
+      el.innerHTML = head + `<div class="widget-sub">${esc(msg)}</div>`;
+      return;
+    }
+    const latest = (state.unread || [])[0];
+    const sub = latest ? `Zuletzt: ${parseSender((latest.messages || [])[0]?.sender).display}` : "Keine ungelesenen Mails";
+    el.innerHTML = head + `<div class="widget-big">${fmtNum(state.unreadTotal)}</div><div class="widget-sub">ungelesen im Posteingang${latest ? " · " + esc(sub) : ""}</div>`;
+  }
+
+  // ---------- Aufgaben ----------
+  function parseDue(s) { return s ? new Date(s + "T00:00:00") : null; }
+
+  function sortedTasks() {
+    const all = state.tasks || [];
+    const open = all.filter((t) => !t.done).sort((a, b) => {
+      const da = a.due || "9999", dbb = b.due || "9999";
+      return da < dbb ? -1 : da > dbb ? 1 : (a.createdAt || 0) - (b.createdAt || 0);
+    });
+    const done = all.filter((t) => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+    return { open, done };
+  }
+
+  function dueHTML(t, now) {
+    const d = parseDue(t.due);
+    if (!d || !isValid(d)) return "";
+    const diff = dayDiff(d, now);
+    if (t.done) return `<div class="due">${esc(shortDay(d, now))}</div>`;
+    if (diff < 0) return `<div class="due over">Überfällig · ${esc(d.toLocaleDateString("de-DE", { day: "numeric", month: "short" }))}</div>`;
+    if (diff === 0) return '<div class="due today">Heute fällig</div>';
+    return `<div class="due">${esc(shortDay(d, now))}</div>`;
+  }
+
+  function taskRow(t, now) {
+    return `<li class="row task hoverable${t.done ? " done" : ""}">
+      <button type="button" class="check" role="checkbox" aria-checked="${t.done ? "true" : "false"}" data-toggle="${esc(t.id)}" aria-label="${t.done ? "Als offen markieren" : "Als erledigt markieren"}"${state.tasksReadOnly ? " disabled" : ""}>${ICON_CHECK}</button>
+      <div class="row-main"><div class="row-title">${esc(t.title)}</div>${dueHTML(t, now)}</div>
+      ${state.tasksReadOnly ? "" : `<button type="button" class="del" data-del="${esc(t.id)}" aria-label="Aufgabe löschen" title="Löschen">${ICON_X}</button>`}
+    </li>`;
+  }
+
+  function renderTasks() {
+    const body = $("#todo-body");
+    const form = $("#add-form");
+    form.hidden = !tasksCol || state.tasksReadOnly;
+    if (state.tasksErr && !state.tasks) { body.innerHTML = `<div class="notice soft" role="status"><span>${esc(state.tasksErr)}</span></div>`; return; }
+    if (!state.tasks) { body.innerHTML = SKELETON; return; }
+    const now = new Date();
+    const { open, done } = sortedTasks();
+    let html = state.tasksErr ? `<div class="notice soft" role="status"><span>${esc(state.tasksErr)}</span></div>` : "";
+    if (!open.length) {
+      html += done.length
+        ? '<div class="empty"><strong>Alles erledigt</strong>Neue Aufgaben trägst du oben ein.</div>'
+        : '<div class="empty"><strong>Noch keine Aufgaben</strong>Schreib oben deine erste Aufgabe hinein, optional mit Fälligkeitsdatum.</div>';
+    } else {
+      html += '<ul class="list">' + open.map((t) => taskRow(t, now)).join("") + "</ul>";
+    }
+    if (done.length) {
+      html += `<div class="done-toggle"><button type="button" data-showdone="1" aria-expanded="${state.showDone}">${state.showDone ? "Erledigte ausblenden" : `Erledigt (${done.length}) einblenden`}</button>${state.showDone && !state.tasksReadOnly ? '<button type="button" data-cleardone="1">Erledigte löschen</button>' : ""}</div>`;
+      if (state.showDone) html += '<ul class="list">' + done.map((t) => taskRow(t, now)).join("") + "</ul>";
+    }
+    body.innerHTML = html;
+  }
+
+  function renderTaskWidget() {
+    const el = $("#w-tasks");
+    const head = '<div class="widget-head"><span class="dot" style="background:var(--orange)"></span>Aufgaben</div>';
+    if (!state.tasks) {
+      el.innerHTML = head + `<div class="widget-sub">${esc(state.tasksErr ? "Nicht verfügbar" : "Lädt …")}</div>`;
+      return;
+    }
+    const now = new Date();
+    const { open } = sortedTasks();
+    const over = open.filter((t) => t.due && dayDiff(parseDue(t.due), now) < 0).length;
+    const today = open.filter((t) => t.due && dayDiff(parseDue(t.due), now) === 0).length;
+    const bits = [];
+    if (over) bits.push(`<span class="chip" style="--chip:var(--red)">${over} überfällig</span>`);
+    if (today) bits.push(`<span class="chip" style="--chip:var(--orange)">${today} heute</span>`);
+    el.innerHTML = head + `<div class="widget-big">${open.length}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="widget-sub">${open.length === 1 ? "offene Aufgabe" : "offene Aufgaben"}</span>${bits.join("")}</div>`;
+  }
+
+  async function writeTask(fn) {
+    try { await fn(); }
+    catch (e) {
+      const code = e && e.code;
+      if (code === "invalid_argument") { state.tasksReadOnly = true; state.tasksErr = "Du kannst diese Liste nur ansehen, nicht ändern."; }
+      else if (code === "quota_exceeded") state.tasksErr = "Die Liste ist voll. Lösche erledigte Aufgaben, um Platz zu schaffen.";
+      else if (code === "revoked") { state.tasksReadOnly = true; state.tasksErr = "Der Zugriff auf die Aufgabenliste wurde beendet."; }
+      else state.tasksErr = "Speichern hat nicht geklappt. Versuch es gleich noch einmal.";
+      renderTasks();
+    }
+  }
+
+  async function initTasks(db, user) {
+    if (!db || !user) {
+      state.tasksErr = "Aufgaben lassen sich nur speichern, wenn du die Seite angemeldet in claude.ai öffnest.";
+      renderTasks(); renderTaskWidget(); return;
+    }
+    let uid = null;
+    try { uid = await user.id(); } catch (e) {}
+    if (!uid) {
+      state.tasksErr = "Melde dich in claude.ai an, um deine Aufgaben zu sehen.";
+      renderTasks(); renderTaskWidget(); return;
+    }
+    tasksCol = db.doc(`data/users/${uid}/dashboard`).collection("tasks");
+    tasksCol.onSnapshot(
+      (snap) => {
+        state.tasks = snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+        if (!state.tasksReadOnly) state.tasksErr = null;
+        renderTasks(); renderTaskWidget();
+      },
+      (e) => {
+        state.tasksErr = e && e.code === "revoked" ? "Der Zugriff auf die Aufgabenliste wurde beendet." : "Die Aufgabenliste ist gerade nicht erreichbar. Lade die Seite neu.";
+        renderTasks(); renderTaskWidget();
+      }
+    );
+    renderTasks();
+  }
+
+  // ---------- Konnektoren beobachten ----------
+  const POLL = { refetchInterval: 120000, cache: { staleTime: 60000, gcTime: 3600000 } };
+
+  function calInput() {
+    const s = startOfDay(new Date());
+    return { startTime: localISO(s), endTime: localISO(addDays(s, 14)), orderBy: "startTime", pageSize: 60 };
+  }
+
+  function stampOf(result) { return (result && result.cache && result.cache.storedAt) || Date.now(); }
+
+  function defineWatches() {
+    watches.cal = {
+      server: GCAL, tool: "list_events", input: calInput(),
+      onData(payload, result) {
+        const evs = (payload && payload.events) || [];
+        state.events = evs.map(parseEvent);
+        state.calErr = null; state.calAt = stampOf(result);
+        renderCal(); renderNextWidget(); renderUpdated();
+      },
+      onError(err) {
+        const info = errorInfo(err, GCAL);
+        state.calErr = info;
+        if (info.retract) state.events = null;
+        renderCal(); renderNextWidget();
+      },
+    };
+    const mailError = (err) => {
+      const info = errorInfo(err, GMAIL);
+      state.mailErr = info;
+      if (info.retract) { state.inbox = null; state.unread = null; state.unreadTotal = null; }
+      renderMail(); renderMailWidget();
+    };
+    watches.unread = {
+      server: GMAIL, tool: "search_threads", input: { query: "in:inbox is:unread", pageSize: 15 },
+      onData(payload, result) {
+        state.unread = (payload && payload.threads) || [];
+        const est = payload && payload.resultCountEstimate;
+        state.unreadTotal = est != null ? Number(est) : state.unread.length;
+        state.mailErr = null; state.mailAt = stampOf(result);
+        renderMail(); renderMailWidget(); renderUpdated();
+      },
+      onError: mailError,
+    };
+    watches.inbox = {
+      server: GMAIL, tool: "search_threads", input: { query: "in:inbox", pageSize: 15 },
+      onData(payload, result) {
+        state.inbox = (payload && payload.threads) || [];
+        state.mailErr = null; state.mailAt = Math.max(state.mailAt || 0, stampOf(result));
+        renderMail(); renderUpdated();
+      },
+      onError: mailError,
+    };
+  }
+
+  function startWatch(key) {
+    const w = watches[key];
+    if (w.unsub) w.unsub();
+    w.unsub = mcp.watchTool(w.server, w.tool, w.input, (ev) => {
+      if (ev.type === "data") w.onData(ev.result && ev.result.payload, ev.result);
+      else w.onError(ev.error);
+    }, POLL);
+  }
+
+  async function approve(server, btn) {
+    if (!mcp) return;
+    btn.disabled = true;
+    for (const w of Object.values(watches).filter((x) => x.server === server)) {
+      try {
+        const r = await mcp.callTool(w.server, w.tool, w.input);
+        w.onData(r.payload, r);
+      } catch (e) { w.onError(e); return; }
+    }
+    try { await mcp.invalidate(server); } catch (e) {}
+  }
+
+  function renderUpdated() {
+    const ts = Math.max(state.calAt || 0, state.mailAt || 0);
+    $("#updated").textContent = ts ? `Aktualisiert ${fmtTime(new Date(ts))}` : "";
+  }
+
+  // ---------- Kopfzeile ----------
+  let lastDay = dayKey(new Date());
+  function renderHeader() {
+    const now = new Date();
+    const h = now.getHours();
+    $("#greeting").textContent = h < 5 ? "Gute Nacht" : h < 11 ? "Guten Morgen" : h < 18 ? "Guten Tag" : h < 23 ? "Guten Abend" : "Gute Nacht";
+    $("#today-label").textContent = now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  }
+
+  function renderAll() {
+    renderHeader(); renderCal(); renderNextWidget(); renderMail(); renderMailWidget(); renderTasks(); renderTaskWidget(); renderUpdated();
+  }
+
+  // ---------- Ereignisse ----------
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.tab) {
+      state.mailTab = t.dataset.tab;
+      try { localStorage.setItem("mailTab", state.mailTab); } catch (err) {}
+      renderMail();
+    } else if (t.dataset.approve) {
+      approve(t.dataset.approve, t);
+    } else if (t.dataset.manage) {
+      use("permissions").then((p) => p && p.manage()).catch(() => {});
+    } else if (t.dataset.toggle && tasksCol) {
+      const task = (state.tasks || []).find((x) => x.id === t.dataset.toggle);
+      if (task) writeTask(() => tasksCol.doc(task.id).update({ done: !task.done, doneAt: task.done ? null : Date.now() }));
+    } else if (t.dataset.del && tasksCol) {
+      const id = t.dataset.del;
+      writeTask(() => tasksCol.doc(id).delete());
+    } else if (t.dataset.showdone) {
+      state.showDone = !state.showDone; renderTasks();
+    } else if (t.dataset.cleardone && tasksCol) {
+      const ids = (state.tasks || []).filter((x) => x.done).map((x) => x.id);
+      writeTask(async () => { for (const id of ids) await tasksCol.doc(id).delete(); });
+    }
+  });
+
+  const titleInput = $("#task-title");
+  titleInput.addEventListener("input", () => { $("#task-add").disabled = !titleInput.value.trim(); });
+  $("#add-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const title = titleInput.value.trim();
+    if (!title || !tasksCol) return;
+    const due = $("#task-due").value || null;
+    titleInput.value = ""; $("#task-due").value = ""; $("#task-add").disabled = true;
+    writeTask(() => tasksCol.add({ title, due, done: false, createdAt: Date.now(), doneAt: null }));
+  });
+
+  $("#refresh").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.classList.remove("spin"); void btn.offsetWidth; btn.classList.add("spin");
+    if (!mcp) return;
+    try { await mcp.invalidate(GCAL); } catch (err) {}
+    try { await mcp.invalidate(GMAIL); } catch (err) {}
+  });
+
+  setInterval(() => {
+    renderHeader();
+    const k = dayKey(new Date());
+    if (k !== lastDay) {
+      lastDay = k;
+      if (mcp && watches.cal) { watches.cal.input = calInput(); startWatch("cal"); }
+    }
+    renderCal(); renderNextWidget(); renderTasks(); renderTaskWidget();
+  }, 60000);
+
+  // ---------- Start ----------
+  renderAll();
+  (async () => {
+    const [m, db, user, perms] = await Promise.all([use("mcp"), use("db"), use("user"), use("permissions")]);
+    initTasks(db, user);
+    mcp = m;
+    if (!mcp) {
+      const info = errorInfo({ code: "not_granted" });
+      state.calErr = info; state.mailErr = info;
+      renderAll();
+      return;
+    }
+    if (perms) {
+      try {
+        const names = [`mcp:${GMAIL}`, `mcp:${GCAL}`];
+        const st = await Promise.all(names.map((n) => perms.state(n).catch(() => "unavailable")));
+        if (st.includes("prompt")) await perms.request(names);
+      } catch (e) {}
+    }
+    defineWatches();
+    startWatch("cal"); startWatch("unread"); startWatch("inbox");
+  })();
+})();
+</script>
