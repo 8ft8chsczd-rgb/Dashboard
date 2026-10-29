@@ -24,6 +24,7 @@
   --sheet: #f2f2f7;
   --group: #ffffff;
   /* Kategorienfarben (geprüfte Reihenfolge, nie zyklisch) */
+  --sun: #ffb800; --cloud: #b9bac2; --moon: #8e8e93;
   --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4; --c6: #008300; --c7: #6250d6; --c-other: #aeaeb2;
 
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -38,6 +39,7 @@
     --seg-on: #636366; --blue: #0a84ff; --red: #ff453a; --orange: #ff9f0a; --green: #30d158;
     --mono-a: #6e7280; --mono-b: #50535c; --shadow: none; --skel: rgba(118, 118, 128, 0.22);
     --sheet: #1c1c1e; --group: #2c2c2e;
+    --sun: #ffc21a; --cloud: #9a9aa2; --moon: #d1d1d6;
     --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #008300; --c7: #9085e9; --c-other: #636366;
     color-scheme: dark;
   }
@@ -50,6 +52,7 @@
   --seg-on: #636366; --blue: #0a84ff; --red: #ff453a; --orange: #ff9f0a; --green: #30d158;
   --mono-a: #6e7280; --mono-b: #50535c; --shadow: none; --skel: rgba(118, 118, 128, 0.22);
     --sheet: #1c1c1e; --group: #2c2c2e;
+    --sun: #ffc21a; --cloud: #9a9aa2; --moon: #d1d1d6;
     --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #008300; --c7: #9085e9; --c-other: #636366;
   color-scheme: dark;
 }
@@ -107,7 +110,7 @@ main { padding-block: 22px 48px; display: grid; gap: 20px; }
 .glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
 .widget {
   background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
-  padding: 16px 18px; display: grid; gap: 4px; min-width: 0;
+  padding: 16px 18px; display: grid; gap: 4px; min-width: 0; align-content: start;
 }
 .widget-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
 .widget-head .dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -287,6 +290,17 @@ details.tbl th { font-weight: 600; color: var(--label-2); }
   font: inherit; font-size: 15px; color: var(--label); background: var(--fill); border: 0; border-radius: 8px; padding: 5px 8px; max-width: 60%;
 }
 .danger { color: var(--red); font-weight: 500; justify-self: center; font-size: 15px; padding: 4px 10px; }
+
+/* Wetter */
+.widget-head svg { flex-shrink: 0; }
+.wx-now { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wx-cond { display: grid; min-width: 0; font-size: 14px; line-height: 1.3; }
+.wx-cond b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wx-cond small { font-size: 13px; color: var(--label-2); font-variant-numeric: tabular-nums; }
+.wx-hours { display: flex; justify-content: space-between; gap: 4px; margin: 2px 0 0; }
+.wx-hours span { display: grid; justify-items: center; gap: 0; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.wx-hours small { font-size: 11px; color: var(--label-2); }
+.wx-hours b { font-size: 13px; font-weight: 600; }
 
 /* Depot */
 .stack { display: grid; gap: 20px; align-content: start; min-width: 0; }
@@ -479,6 +493,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     <div class="widget" id="w-next"></div>
     <div class="widget" id="w-mail"></div>
     <div class="widget" id="w-tasks"></div>
+    <div class="widget" id="w-weather"></div>
   </section>
 
   <section class="card cal-card" aria-labelledby="cal-title">
@@ -715,6 +730,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     view: "uebersicht",
     fin: { tx: null, budgets: null, fixed: null, goals: null, depot: null }, finErr: null, finReadOnly: false,
     depotQuotes: undefined, depotErr: null,
+    wx: undefined, wxErr: null,
     finMonth: { y: new Date().getFullYear(), m: new Date().getMonth() },
   };
   try { const t = localStorage.getItem("mailTab"); if (t === "inbox" || t === "unread") state.mailTab = t; } catch (e) {}
@@ -1491,11 +1507,12 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
   async function initFinance(db, user) {
     if (!db || !user) {
       state.finErr = "Finanzen lassen sich nur speichern, wenn du die Seite angemeldet in claude.ai öffnest.";
+      state.wx = null; maybeFetchWeather();
       renderFinance(); return;
     }
     let uid = null;
     try { uid = await user.id(); } catch (e) {}
-    if (!uid) { state.finErr = "Melde dich in claude.ai an, um deine Finanzen zu sehen."; renderFinance(); return; }
+    if (!uid) { state.finErr = "Melde dich in claude.ai an, um deine Finanzen zu sehen."; state.wx = null; maybeFetchWeather(); renderFinance(); return; }
     const base = db.doc(`data/users/${uid}/dashboard`);
     finCols = { tx: base.collection("tx"), budgets: base.collection("budgets"), fixed: base.collection("fixed"), goals: base.collection("goals"), depot: base.collection("depot"), meta: base.collection("meta") };
     const docsOf = (snap) => snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
@@ -1508,6 +1525,10 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     finCols.fixed.onSnapshot((snap) => { state.fin.fixed = docsOf(snap); renderFinance(); }, onErr);
     finCols.goals.onSnapshot((snap) => { state.fin.goals = docsOf(snap); renderFinance(); }, onErr);
     finCols.depot.onSnapshot((snap) => { state.fin.depot = docsOf(snap); renderDepot(); maybeFetchQuotes(); }, onErr);
+    finCols.meta.doc("weather").onSnapshot((snap) => {
+      if (snap.exists) state.wx = snap.data(); else if (state.wx === undefined) state.wx = null;
+      renderWeather(); maybeFetchWeather();
+    }, () => { if (state.wx === undefined) state.wx = null; maybeFetchWeather(); });
     finCols.meta.doc("quotes").onSnapshot((snap) => {
       state.depotQuotes = snap.exists ? snap.data() : null;
       renderDepot(); maybeFetchQuotes();
@@ -2113,7 +2134,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     return byAge.map((p, i) => {
       const sym = String(p.symbol || "").toUpperCase();
       const q = quotes[sym];
-      const cost = Math.round((p.qty || 0) * (p.buyPrice || 0));
+      const cost = p.invested || Math.round((p.qty || 0) * (p.buyPrice || 0));
       const priceEur = q ? toEur(q.price, q.currency, fx) : null;
       const value = priceEur != null ? Math.round((p.qty || 0) * priceEur * 100) : null;
       const day = priceEur != null && q.cp ? Math.round((p.qty || 0) * (priceEur - priceEur / (1 + q.cp)) * 100) : 0;
@@ -2197,7 +2218,8 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
         { id: "symbol", type: "symbol", label: "Symbol", value: p ? p.symbol : "" },
         { id: "name", type: "text", label: "Name", placeholder: "z. B. SAP", value: p ? p.name || "" : "" },
         { id: "qty", type: "text", label: "Stückzahl", placeholder: "z. B. 10", value: p ? String(p.qty).replace(".", ",") : "", inputmode: "decimal" },
-        { id: "buy", type: "amount", label: "Kaufkurs je Stück", value: p ? toInput(p.buyPrice) : "" },
+        { id: "invested", type: "amount", label: "Eingezahlt gesamt", value: p && p.invested ? toInput(p.invested) : "" },
+        { id: "buy", type: "amount", label: "oder Kaufkurs je Stück", value: p && !p.invested ? toInput(p.buyPrice) : "" },
       ],
       after: '<div class="hint-txt">Tipp: Für Kurse direkt in Euro die Xetra-Notierung nehmen, also Symbole mit der Endung .DE (z. B. SAP.DE). Die Suche kostet ca. 5 Firecrawl-Credits.</div><div id="sym-results"></div>',
       check(v) {
@@ -2205,9 +2227,11 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
         if (!SYMBOL_RE.test(symbol)) return "Gib ein gültiges Symbol ein, zum Beispiel SAP.DE, oder nutze die Suche.";
         const qty = parseQty(v.qty);
         if (!qty) return "Gib eine Stückzahl größer als 0 ein, zum Beispiel 10 oder 2,5.";
+        const invested = needAmount(v.invested);
+        if (invested) return { symbol, name: v.name.trim(), qty, invested, buyPrice: Math.round(invested / qty) };
         const buyPrice = needAmount(v.buy);
-        if (!buyPrice) return "Gib den Kaufkurs je Stück in Euro ein, zum Beispiel 182,40.";
-        return { symbol, name: v.name.trim(), qty, buyPrice };
+        if (!buyPrice) return "Gib ein, wie viel du insgesamt eingezahlt hast, oder den Kaufkurs je Stück in Euro.";
+        return { symbol, name: v.name.trim(), qty, invested: null, buyPrice };
       },
       save: (d) => (p ? finCols.depot.doc(p.id).update(d) : finCols.depot.add(Object.assign(d, { createdAt: Date.now() }))),
       onDelete: p ? () => finCols.depot.doc(p.id).delete() : null,
@@ -2245,6 +2269,130 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       $("#f-qty").focus();
     }
   });
+  // ---------- Wetter (DWD über Bright Sky, abgerufen mit Firecrawl) ----------
+  const WX = { name: "Wittlich", lat: 49.985, lon: 6.889 };
+  const WX_TTL = 1800000;
+  let wxFetching = false;
+  let wxErrAt = 0;
+
+  const WX_LABEL = {
+    "clear-day": "Sonnig", "clear-night": "Klar", "partly-cloudy-day": "Leicht bewölkt", "partly-cloudy-night": "Leicht bewölkt",
+    cloudy: "Bewölkt", fog: "Nebel", wind: "Windig", rain: "Regen", sleet: "Schneeregen", snow: "Schnee", hail: "Hagel", thunderstorm: "Gewitter",
+  };
+  const CLOUD = '<path d="M7.2 19h9.6a4.2 4.2 0 0 0 .6-8.36A6 6 0 0 0 6 11.5 3.75 3.75 0 0 0 7.2 19Z" fill="var(--cloud)"/>';
+  const CLOUD_UP = '<path d="M7.2 15.5h9.6a4.2 4.2 0 0 0 .6-8.36A6 6 0 0 0 6 8 3.75 3.75 0 0 0 7.2 15.5Z" fill="var(--cloud)"/>';
+  const sunAt = (cx, cy, r) => {
+    let rays = "";
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4, r1 = r + 2, r2 = r + 4;
+      rays += `M${(cx + r1 * Math.cos(a)).toFixed(2)} ${(cy + r1 * Math.sin(a)).toFixed(2)}L${(cx + r2 * Math.cos(a)).toFixed(2)} ${(cy + r2 * Math.sin(a)).toFixed(2)}`;
+    }
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--sun)"/><path d="${rays}" stroke="var(--sun)" stroke-width="1.8" stroke-linecap="round"/>`;
+  };
+  const moonAt = (cx, cy, r) => `<path d="M${cx + r * 0.2} ${cy - r}A${r} ${r} 0 1 0 ${cx + r} ${cy + r * 0.25}A${r * 0.8} ${r * 0.8} 0 0 1 ${cx + r * 0.2} ${cy - r}Z" fill="var(--moon)"/>`;
+  function wxIcon(name, size) {
+    let g;
+    switch (name) {
+      case "clear-day": g = sunAt(12, 12, 5); break;
+      case "clear-night": g = moonAt(12, 12, 7); break;
+      case "partly-cloudy-day": g = sunAt(9, 8.5, 3.6) + CLOUD; break;
+      case "partly-cloudy-night": g = moonAt(9, 8, 4.5) + CLOUD; break;
+      case "fog": g = '<path d="M4 9h16M6 13h12M4 17h16" stroke="var(--cloud)" stroke-width="2.2" stroke-linecap="round"/>'; break;
+      case "wind": g = '<path d="M3 9h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 17h7" stroke="var(--cloud)" stroke-width="2" stroke-linecap="round" fill="none"/>'; break;
+      case "rain": g = CLOUD_UP + '<path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"/>'; break;
+      case "sleet": g = CLOUD_UP + '<path d="M8 18l-1 3M16 18l-1 3" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="20" r="1.3" fill="var(--blue)"/>'; break;
+      case "snow": g = CLOUD_UP + '<circle cx="8" cy="19.5" r="1.3" fill="var(--blue)"/><circle cx="12" cy="21" r="1.3" fill="var(--blue)"/><circle cx="16" cy="19.5" r="1.3" fill="var(--blue)"/>'; break;
+      case "hail": g = CLOUD_UP + '<circle cx="8" cy="19.5" r="1.6" fill="var(--cloud)"/><circle cx="12" cy="21" r="1.6" fill="var(--cloud)"/><circle cx="16" cy="19.5" r="1.6" fill="var(--cloud)"/>'; break;
+      case "thunderstorm": g = CLOUD_UP + '<path d="M12.5 15l-2.5 4h3l-1.5 3.5" stroke="var(--sun)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>'; break;
+      default: g = CLOUD;
+    }
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">${g}</svg>`;
+  }
+
+  async function scrapeJson(url) {
+    const res = await mcp.callTool(FIRECRAWL, "firecrawl_scrape", {
+      url, formats: ["rawHtml"], maxAge: 0, objective: "Aktuelles Wetter für das persönliche Dashboard abrufen",
+    }, { cache: false });
+    const p = (res && res.payload) || {};
+    const raw = p.rawHtml || (p.data && p.data.rawHtml);
+    const status = (p.metadata && p.metadata.statusCode) || (p.data && p.data.metadata && p.data.metadata.statusCode);
+    if (!raw || (status && status !== 200)) throw { code: "upstream_error" };
+    return JSON.parse(raw);
+  }
+
+  async function fetchWeather(force) {
+    if (wxFetching) return;
+    if (!mcp) { state.wxErr = "Das Wetter lässt sich nur laden, wenn du die Seite in claude.ai öffnest."; renderWeather(); return; }
+    if (!force && state.wx && Date.now() - (state.wx.at || 0) < WX_TTL) return;
+    wxFetching = true; renderWeather();
+    try {
+      const base = `https://api.brightsky.dev/`;
+      const loc = `lat=${WX.lat}&lon=${WX.lon}&tz=Europe/Berlin`;
+      const today = startOfDay(new Date());
+      const [cur, fc] = await Promise.all([
+        scrapeJson(`${base}current_weather?${loc}`),
+        scrapeJson(`${base}weather?${loc}&date=${dayKey(today)}&last_date=${dayKey(addDays(today, 2))}`),
+      ]);
+      const w = cur.weather || {};
+      const station = ((cur.sources || []).find((s) => s.id === w.source_id) || {}).station_name || "";
+      const doc = {
+        at: Date.now(),
+        now: {
+          t: w.temperature, icon: w.icon || "cloudy", wind: w.wind_speed_10 != null ? w.wind_speed_10 : w.wind_speed_30,
+          gust: w.wind_gust_speed_10, hum: w.relative_humidity, time: w.timestamp || null, station,
+        },
+        hours: (fc.weather || []).map((h) => ({ ts: h.timestamp, t: h.temperature, icon: h.icon, pp: h.precipitation_probability, p: h.precipitation })),
+      };
+      state.wx = doc; state.wxErr = null; wxErrAt = 0;
+      if (finCols) finWrite(() => finCols.meta.doc("weather").set(doc));
+    } catch (e) {
+      wxErrAt = Date.now();
+      const cfg = e && ["server_not_connected", "server_not_found", "needs_reauth", "selection_required", "approval_required", "not_in_manifest", "consent_required", "blocked_by_policy"].includes(e.code);
+      state.wxErr = cfg
+        ? "Für das Wetter braucht die Seite den Firecrawl-Konnektor. Prüfe ihn unter claude.ai → Einstellungen → Konnektoren."
+        : "Das Wetter ist gerade nicht abrufbar. Die Seite versucht es später erneut.";
+    }
+    wxFetching = false;
+    renderWeather();
+  }
+
+  function maybeFetchWeather() {
+    if (!mcp || wxFetching || state.wx === undefined) return;
+    if (document.visibilityState === "hidden") return;
+    if (wxErrAt && Date.now() - wxErrAt < 600000) return;
+    if (!state.wx || Date.now() - (state.wx.at || 0) >= WX_TTL) fetchWeather(false);
+  }
+  document.addEventListener("visibilitychange", maybeFetchWeather);
+
+  const deg = (t) => `${Math.round(t) < 0 ? "−" : ""}${Math.abs(Math.round(t))}°`;
+
+  function renderWeather() {
+    const el = $("#w-weather");
+    const head = `<div class="widget-head">${wxIcon("partly-cloudy-day", 14)}Wetter · ${esc(WX.name)}</div>`;
+    const wx = state.wx;
+    if (!wx || !wx.now || wx.now.t == null) {
+      el.innerHTML = head + `<div class="widget-sub">${esc(state.wxErr || (wxFetching || state.wx === undefined ? "Lädt …" : "Noch keine Daten"))}</div>`;
+      return;
+    }
+    const now = new Date();
+    const tk = dayKey(now);
+    const hours = (wx.hours || []).map((h) => Object.assign({}, h, { d: new Date(h.ts) })).filter((h) => isValid(h.d));
+    const todayTemps = hours.filter((h) => dayKey(h.d) === tk && h.t != null).map((h) => h.t).concat([wx.now.t]);
+    const hi = Math.round(Math.max(...todayTemps)), lo = Math.round(Math.min(...todayTemps));
+    const ahead = hours.filter((h) => h.d > now);
+    const next12 = ahead.slice(0, 12);
+    const pp = next12.reduce((m, h) => Math.max(m, h.pp || 0), 0);
+    const strip = ahead.filter((_, i) => i % 2 === 0).slice(0, 5);
+    const at = wx.now.time ? new Date(wx.now.time) : new Date(wx.at);
+    el.innerHTML = head + `
+      <div class="wx-now">
+        ${wxIcon(wx.now.icon, 38)}
+        <span class="widget-big">${deg(wx.now.t)}</span>
+        <span class="wx-cond"><b>${esc(WX_LABEL[wx.now.icon] || "—")}</b><small>H ${deg(hi)} · T ${deg(lo)}</small></span>
+      </div>
+      <div class="wx-hours">${strip.map((h) => `<span><small>${pad(h.d.getHours())}</small>${wxIcon(h.icon, 16)}<b>${deg(h.t)}</b></span>`).join("")}</div>
+      <div class="widget-sub" title="Messung DWD-Station ${esc(wx.now.station)}, Vorhersage DWD MOSMIX">Regen ${pp} % · Wind ${Math.round(wx.now.wind || 0)} km/h · ${esc(fmtTime(at))}${wxFetching ? " · lädt" : ""}</div>`;
+  }
 
   $("#view-finanzen").addEventListener("click", async (e) => {
     const b = e.target.closest("button");
@@ -2294,7 +2442,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
   }
 
   function renderAll() {
-    renderHeader(); renderCal(); renderNextWidget(); renderMail(); renderMailWidget(); renderTasks(); renderTaskWidget(); renderUpdated();
+    renderHeader(); renderCal(); renderNextWidget(); renderMail(); renderMailWidget(); renderTasks(); renderTaskWidget(); renderUpdated(); renderWeather();
   }
 
   // ---------- Ereignisse ----------
@@ -2415,6 +2563,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     if (!mcp) return;
     try { await mcp.invalidate(GCAL); } catch (err) {}
     try { await mcp.invalidate(GMAIL); } catch (err) {}
+    fetchWeather(true);
   });
 
   setInterval(() => {
@@ -2426,6 +2575,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       setWeek(state.weekOffset);
     }
     renderCal(); renderNextWidget(); renderTasks(); renderTaskWidget();
+    renderWeather(); maybeFetchWeather();
   }, 60000);
 
   // ---------- Start ----------
@@ -2438,6 +2588,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     initFinance(db, user);
     mcp = m;
     if (!mcp) {
+      state.wxErr = "Das Wetter lässt sich nur laden, wenn du die Seite in claude.ai öffnest.";
       const info = errorInfo({ code: "not_granted" });
       state.calErr = info; state.mailErr = info;
       renderAll();
@@ -2445,13 +2596,14 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     }
     if (perms) {
       try {
-        const names = [`mcp:${GMAIL}`, `mcp:${GCAL}`];
+        const names = [`mcp:${GMAIL}`, `mcp:${GCAL}`, "mcp:Firecrawl"];
         const st = await Promise.all(names.map((n) => perms.state(n).catch(() => "unavailable")));
         if (st.includes("prompt")) await perms.request(names);
       } catch (e) {}
     }
     defineWatches();
     startWatch("cal"); startWatch("unread"); startWatch("inbox");
+    maybeFetchWeather();
   })();
 })();
 </script>
