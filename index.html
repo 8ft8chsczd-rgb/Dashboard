@@ -1,7 +1,7 @@
 <title>Mein Tag</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-/* Layout: glasige Kopfzeile mit großem Titel, darunter drei Kurzinfo-Widgets und drei Karten (Kalender · Mail · Aufgaben) im Raster */
+/* Layout: glasige Kopfzeile mit großem Titel, darunter drei Kurzinfo-Widgets, der Kalender als Wochenraster über die volle Breite, darunter Mail und Aufgaben */
 :root {
   --bg: #f5f5f7;
   --card: #ffffff;
@@ -21,6 +21,8 @@
   --mono-b: #868a94;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 28px rgba(0, 0, 0, 0.05);
   --skel: rgba(118, 118, 128, 0.14);
+  --sheet: #f2f2f7;
+  --group: #ffffff;
 
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -33,6 +35,7 @@
     --fill: rgba(118, 118, 128, 0.24); --fill-2: rgba(118, 118, 128, 0.16); --sep: rgba(84, 84, 88, 0.55);
     --seg-on: #636366; --blue: #0a84ff; --red: #ff453a; --orange: #ff9f0a; --green: #30d158;
     --mono-a: #6e7280; --mono-b: #50535c; --shadow: none; --skel: rgba(118, 118, 128, 0.22);
+    --sheet: #1c1c1e; --group: #2c2c2e;
     color-scheme: dark;
   }
 }
@@ -43,6 +46,7 @@
   --fill: rgba(118, 118, 128, 0.24); --fill-2: rgba(118, 118, 128, 0.16); --sep: rgba(84, 84, 88, 0.55);
   --seg-on: #636366; --blue: #0a84ff; --red: #ff453a; --orange: #ff9f0a; --green: #30d158;
   --mono-a: #6e7280; --mono-b: #50535c; --shadow: none; --skel: rgba(118, 118, 128, 0.22);
+    --sheet: #1c1c1e; --group: #2c2c2e;
   color-scheme: dark;
 }
 
@@ -151,15 +155,93 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
 .row-sub { color: var(--label-2); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-side { font-size: 13px; color: var(--label-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-/* Kalender */
-.day { padding: 12px 18px 4px; font-size: 13px; font-weight: 600; color: var(--label-2); display: flex; gap: 8px; align-items: baseline; }
-.day.today { color: var(--red); }
-.day .count { font-weight: 400; color: var(--label-3); }
-.ev { --inset: 86px; }
-.ev-time { width: 52px; flex-shrink: 0; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; line-height: 1.35; padding-top: 1px; }
-.ev-time .end { color: var(--label-2); }
-.ev-bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--ev, var(--blue)); flex-shrink: 0; }
-.ev.now .ev-title::after { content: "Jetzt"; margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: .04em; vertical-align: 1px; }
+/* Kalender: Wochenraster */
+.cal-card .card-head { padding-bottom: 14px; }
+.cal-card .card-head .grow { flex: 1 1 220px; }
+.cal-card .card-meta { white-space: nowrap; }
+.week-nav { display: inline-flex; align-items: center; background: var(--fill); border-radius: 9px; padding: 2px; }
+.week-nav button { font-size: 13px; font-weight: 500; height: 26px; min-width: 30px; padding: 0 10px; border-radius: 7px; display: grid; place-items: center; }
+.week-nav button:hover:not(:disabled) { background: var(--seg-on); }
+.week-nav button:disabled { color: var(--label-3); cursor: default; }
+.week-nav svg { width: 14px; height: 14px; }
+.add-ev { display: inline-flex; align-items: center; gap: 6px; background: var(--blue); color: #fff; font-size: 14px; font-weight: 600; padding: 6px 14px 6px 11px; border-radius: 999px; }
+.add-ev svg { width: 14px; height: 14px; }
+.kw { font-size: 12px; font-weight: 600; color: var(--label-2); background: var(--fill); border-radius: 6px; padding: 1px 6px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.week-scroll { overflow-x: auto; border-top: 0.5px solid var(--sep); scroll-snap-type: x proximity; }
+.week { display: grid; grid-template-columns: repeat(7, minmax(128px, 1fr)); min-height: 250px; }
+.wday { border-left: 0.5px solid var(--sep); display: flex; flex-direction: column; min-width: 0; scroll-snap-align: start; }
+.wday:first-child { border-left: 0; }
+.wday.weekend { background: var(--fill-2); }
+.wday-head { display: flex; align-items: center; gap: 6px; padding: 10px 8px 8px 10px; }
+.wd { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--label-2); }
+.wn { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; min-width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 999px; }
+.wday.today .wd { color: var(--red); }
+.wday.today .wn { background: var(--red); color: #fff; font-size: 16px; padding: 0 6px; }
+.wday.past .wd, .wday.past .wn { color: var(--label-3); }
+.wadd { margin-left: auto; width: 26px; height: 26px; border-radius: 50%; color: var(--blue); display: grid; place-items: center; opacity: 0; transition: opacity .15s; }
+.wadd svg { width: 14px; height: 14px; }
+.wday:hover .wadd, .wadd:focus-visible { opacity: 1; }
+.wadd:hover { background: var(--fill); }
+@media (hover: none) { .wadd { opacity: 1; } }
+.wday-body { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 0 8px 12px; cursor: pointer; }
+.blk {
+  display: block; min-width: 0; border-radius: 6px; padding: 6px 8px 7px;
+  background: color-mix(in srgb, var(--ev, var(--blue)) 15%, var(--card));
+  border-left: 3px solid var(--ev, var(--blue)); cursor: pointer;
+}
+.blk:hover { background: color-mix(in srgb, var(--ev, var(--blue)) 24%, var(--card)); }
+.blk > span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.blk-time { font-size: 11.5px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--ev, var(--blue)) 65%, var(--label)); }
+.blk-title { font-size: 13px; font-weight: 600; line-height: 1.25; overflow-wrap: break-word; hyphens: auto; display: -webkit-box !important; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.blk-loc { font-size: 12px; color: var(--label-2); white-space: nowrap; }
+.blk.all { background: var(--ev, var(--blue)); border-left: 0; color: #fff; padding: 4px 8px; }
+.blk.all:hover { background: color-mix(in srgb, var(--ev, var(--blue)) 85%, #000); }
+.blk.all .blk-title { font-size: 12.5px; -webkit-line-clamp: 1; }
+.blk.ended { opacity: .5; }
+.blk.now { box-shadow: 0 0 0 1.5px var(--ev, var(--blue)); }
+.blk.skel-blk { height: 46px; background: var(--skel); border-left: 0; cursor: default; animation: pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .blk.skel-blk { animation: none; } }
+
+/* Neuer Termin: Sheet im Stil von Apple Kalender */
+dialog.sheet-dlg {
+  border: 0; padding: 0; border-radius: 16px; background: var(--sheet); color: var(--label);
+  width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
+}
+dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
+.sheet { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 14px 16px 18px; }
+.sheet-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.sheet-head h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.sheet-head .link-btn { justify-self: start; font-size: 16px; }
+.sheet-head .link-btn.strong { justify-self: end; font-weight: 600; }
+.link-btn:disabled { color: var(--label-3); cursor: default; }
+.sheet .field-box { background: var(--group); }
+.sheet .field-box input.plain { font-weight: 400; border-top: 0.5px solid var(--sep); }
+.sheet .field-box textarea.solo { border-top: 0; min-height: 76px; }
+.group { background: var(--group); border-radius: 12px; }
+.grow-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 12px; min-height: 46px; flex-wrap: wrap; }
+.grow-row + .grow-row { border-top: 0.5px solid var(--sep); }
+.grow-row .pickers { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.grow-row input[type="date"], .grow-row input[type="time"] {
+  font: inherit; font-size: 15px; color: var(--label); background: var(--fill); border: 0; border-radius: 8px; padding: 5px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.switch {
+  -webkit-appearance: none; appearance: none; margin: 0; width: 51px; height: 31px; border-radius: 999px; flex-shrink: 0;
+  background: var(--fill); position: relative; cursor: pointer; transition: background .2s;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #ffffff; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); transition: transform .2s;
+}
+.switch:checked { background: var(--green); }
+.switch:checked::after { transform: translateX(20px); }
+.ev-msg { font-size: 14px; color: var(--red); padding: 0 4px; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20;
+  background: var(--label); color: var(--bg); font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: 999px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2); white-space: nowrap;
+}
 
 /* Mail */
 .seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--fill); border-radius: 9px; padding: 2px; }
@@ -285,24 +367,30 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
     <div class="widget" id="w-tasks"></div>
   </section>
 
-  <section class="cards">
-    <article class="card" aria-labelledby="cal-title">
-      <div class="card-head">
-        <div class="app-icon cal" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
-        </div>
-        <div class="grow">
-          <div class="card-title" id="cal-title">Kalender</div>
-          <div class="card-meta">Die nächsten 14 Tage</div>
-        </div>
+  <section class="card cal-card" aria-labelledby="cal-title">
+    <div class="card-head">
+      <div class="app-icon cal" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
       </div>
-      <div id="cal-body"></div>
-      <div class="card-foot">
-        <span id="cal-fresh"></span>
-        <a href="https://calendar.google.com/calendar/r/agenda" target="_blank" rel="noopener">In Google Kalender öffnen</a>
+      <div class="grow">
+        <div class="card-title" id="cal-title">Kalender</div>
+        <div class="card-meta"><span id="week-label">Diese Woche</span><span class="kw" id="week-kw"></span></div>
       </div>
-    </article>
+      <div class="week-nav" role="group" aria-label="Woche wählen">
+        <button type="button" data-weeknav="-1" aria-label="Vorherige Woche" title="Vorherige Woche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg></button>
+        <button type="button" data-weeknav="0" id="week-today">Heute</button>
+        <button type="button" data-weeknav="1" aria-label="Nächste Woche" title="Nächste Woche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button>
+      </div>
+      <button type="button" class="add-ev" id="cal-add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Termin</button>
+    </div>
+    <div id="cal-body"></div>
+    <div class="card-foot">
+      <span id="cal-fresh"></span>
+      <a id="cal-open" href="https://calendar.google.com/calendar/r/week" target="_blank" rel="noopener">In Google Kalender öffnen</a>
+    </div>
+  </section>
 
+  <section class="cards">
     <article class="card" aria-labelledby="mail-title">
       <div class="card-head">
         <div class="app-icon mail" aria-hidden="true">
@@ -354,6 +442,39 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
   </section>
 </main>
 
+<dialog class="sheet-dlg" id="ev-dialog" aria-labelledby="ev-dialog-title">
+  <form class="sheet" id="ev-form" autocomplete="off" novalidate>
+    <div class="sheet-head">
+      <button type="button" class="link-btn" id="ev-cancel">Abbrechen</button>
+      <h2 id="ev-dialog-title">Neuer Termin</h2>
+      <button type="submit" class="link-btn strong" id="ev-save">Hinzufügen</button>
+    </div>
+    <div class="field-box">
+      <label class="sr" for="ev-title">Titel</label>
+      <input type="text" id="ev-title" placeholder="Titel" maxlength="200">
+      <label class="sr" for="ev-location">Ort</label>
+      <input type="text" id="ev-location" class="plain" placeholder="Ort (optional)" maxlength="200">
+    </div>
+    <div class="group">
+      <label class="grow-row" for="ev-allday"><span>Ganztägig</span><input type="checkbox" id="ev-allday" class="switch" role="switch"></label>
+      <div class="grow-row">
+        <label for="ev-date">Beginn</label>
+        <span class="pickers"><input type="date" id="ev-date" aria-label="Beginn Datum"><input type="time" id="ev-start" step="300" aria-label="Beginn Uhrzeit"></span>
+      </div>
+      <div class="grow-row">
+        <label for="ev-end-date">Ende</label>
+        <span class="pickers"><input type="date" id="ev-end-date" aria-label="Ende Datum"><input type="time" id="ev-end" step="300" aria-label="Ende Uhrzeit"></span>
+      </div>
+    </div>
+    <div class="field-box">
+      <label class="sr" for="ev-notes">Notizen</label>
+      <textarea id="ev-notes" class="solo" rows="3" maxlength="4000" placeholder="Notizen (optional)"></textarea>
+    </div>
+    <div class="ev-msg" id="ev-msg" role="alert" hidden></div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+
 <script>
 (() => {
   "use strict";
@@ -367,6 +488,7 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
 
   const state = {
     events: null, calErr: null, calAt: null,
+    weekOffset: 0, weekEvents: null, weekErr: null, weekAt: null,
     inbox: null, unread: null, unreadTotal: null, mailErr: null, mailAt: null,
     mailTab: "unread",
     tasks: null, tasksErr: null, tasksReadOnly: false, showDone: false, editing: null,
@@ -389,12 +511,6 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
   const fmtNum = (n) => Number(n).toLocaleString("de-DE");
   const isValid = (d) => d instanceof Date && !isNaN(d);
 
-  function dayLabel(d, now = new Date()) {
-    const diff = dayDiff(d, now);
-    if (diff === 0) return "Heute";
-    if (diff === 1) return "Morgen";
-    return d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
-  }
   function shortDay(d, now = new Date()) {
     const diff = dayDiff(d, now);
     if (diff === 0) return "Heute";
@@ -470,48 +586,239 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
       .sort((a, b) => a.start - b.start || (b.allDay - a.allDay));
   }
 
+  const ICON_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+  function isoWeek(d) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const wd = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - wd);
+    const y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - y) / 86400000 + 1) / 7);
+  }
+  const weekStart = () => addDays(startOfDay(new Date()), state.weekOffset * 7);
+  // Die ersten zwei Wochen stecken schon in den Daten für „Nächster Termin“ (14 Tage).
+  const weekCovered = () => state.weekOffset === 0 || state.weekOffset === 1;
+
+  function blockHTML(ev, day, now) {
+    const style = ev.color ? ` style="--ev:${ev.color}"` : "";
+    const tag = ev.link ? "a" : "div";
+    const href = ev.link ? ` href="${esc(ev.link)}" target="_blank" rel="noopener"` : "";
+    if (ev.allDay) {
+      return `<${tag} class="blk all"${href}${style} title="${esc(ev.title)} · ganztägig"><span class="blk-title">${esc(ev.title)}</span></${tag}>`;
+    }
+    const ended = ev.end <= now;
+    const running = ev.start <= now && ev.end > now;
+    const nextDay = addDays(day, 1);
+    let time;
+    if (ev.start < day && ev.end > nextDay) time = "ganztägig";
+    else if (ev.start < day) time = `bis ${fmtTime(ev.end)}`;
+    else if (ev.end > nextDay) time = `ab ${fmtTime(ev.start)}`;
+    else time = `${fmtTime(ev.start)}–${fmtTime(ev.end)}`;
+    return `<${tag} class="blk${ended ? " ended" : ""}${running ? " now" : ""}"${href}${style}>
+      <span class="blk-time">${esc(time)}${running ? " · jetzt" : ""}</span>
+      <span class="blk-title" lang="de">${esc(ev.title)}</span>
+      ${ev.location ? `<span class="blk-loc">${esc(ev.location)}</span>` : ""}
+    </${tag}>`;
+  }
+
   function renderCal() {
     const body = $("#cal-body");
-    $("#cal-fresh").textContent = state.events ? freshText(state.calAt) : "";
-    const notice = noticeHTML(state.calErr, GCAL);
-    const list = upcomingEvents();
-    if (!list) { body.innerHTML = notice || SKELETON; return; }
-    if (!list.length) {
-      body.innerHTML = notice + '<div class="empty"><strong>Keine Termine</strong>In den nächsten 14 Tagen ist nichts eingetragen.</div>';
-      return;
-    }
     const now = new Date();
-    const groups = new Map();
-    for (const ev of list.slice(0, 30)) {
-      const anchor = ev.start < startOfDay(now) ? startOfDay(now) : ev.start;
-      const k = dayKey(anchor);
-      if (!groups.has(k)) groups.set(k, { date: anchor, items: [] });
-      groups.get(k).items.push(ev);
+    const ws = weekStart();
+    const last = addDays(ws, 6);
+    const kw1 = isoWeek(ws), kw2 = isoWeek(last);
+    $("#week-label").textContent = `${ws.toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – ${last.toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" })}`;
+    $("#week-kw").textContent = kw1 === kw2 ? `KW ${kw1}` : `KW ${kw1}/${kw2}`;
+    $("#week-today").disabled = state.weekOffset === 0;
+    $("#cal-open").href = `https://calendar.google.com/calendar/r/week/${ws.getFullYear()}/${ws.getMonth() + 1}/${ws.getDate()}`;
+
+    const covered = weekCovered();
+    const src = covered ? state.events : state.weekEvents;
+    const err = covered ? state.calErr : state.weekErr;
+    $("#cal-fresh").textContent = src ? freshText(covered ? state.calAt : state.weekAt) : "";
+    const evs = (src || []).filter((e) => e.status !== "cancelled" && isValid(e.start));
+
+    let html = noticeHTML(err, GCAL) + '<div class="week-scroll"><div class="week">';
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(ws, i);
+      const next = addDays(d, 1);
+      const k = dayKey(d);
+      const diff = dayDiff(d, now);
+      const wdNum = d.getDay();
+      const cls = ["wday", diff === 0 ? "today" : "", diff < 0 ? "past" : "", wdNum === 0 || wdNum === 6 ? "weekend" : ""].filter(Boolean).join(" ");
+      const items = evs
+        .filter((e) => e.start < next && (e.end > d || e.start >= d))
+        .sort((a, b) => (b.allDay - a.allDay) || (a.start - b.start));
+      const longDate = d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
+      html += `<div class="${cls}">
+        <div class="wday-head">
+          <span class="wd">${esc(d.toLocaleDateString("de-DE", { weekday: "short" }).replace(".", ""))}</span>
+          <span class="wn"${diff === 0 ? ' aria-label="Heute"' : ""}>${d.getDate()}</span>
+          <button type="button" class="wadd" data-newday="${k}" aria-label="Termin am ${esc(longDate)} anlegen" title="Termin anlegen">${ICON_PLUS}</button>
+        </div>
+        <div class="wday-body" data-newday="${k}">${src ? items.map((e) => blockHTML(e, d, now)).join("") : err && err.retract ? "" : '<span class="blk skel-blk"></span><span class="blk skel-blk"></span>'}</div>
+      </div>`;
     }
-    let html = notice;
-    for (const { date, items } of groups.values()) {
-      const isToday = dayDiff(date, now) === 0;
-      html += `<div class="day${isToday ? " today" : ""}">${esc(dayLabel(date, now))}<span class="count">${items.length} ${items.length === 1 ? "Termin" : "Termine"}</span></div><ul class="list">`;
-      for (const ev of items) {
-        const running = !ev.allDay && ev.start <= now && ev.end > now;
-        const time = ev.allDay
-          ? '<div class="end">ganz&shy;tägig</div>'
-          : `<div>${fmtTime(ev.start)}</div><div class="end">${fmtTime(ev.end)}</div>`;
-        const tag = ev.link ? "a" : "div";
-        const href = ev.link ? ` href="${esc(ev.link)}" target="_blank" rel="noopener"` : "";
-        html += `<li><${tag} class="row ev${running ? " now" : ""}"${href}${ev.color ? ` style="--ev:${ev.color}"` : ""}>
-          <div class="ev-time">${time}</div>
-          <div class="ev-bar"></div>
-          <div class="row-main">
-            <div class="row-title ev-title">${esc(ev.title)}</div>
-            ${ev.location ? `<div class="row-sub">${esc(ev.location)}</div>` : ""}
-          </div>
-        </${tag}></li>`;
-      }
-      html += "</ul>";
-    }
-    body.innerHTML = html;
+    body.innerHTML = html + "</div></div>";
   }
+
+  function setWeek(offset) {
+    state.weekOffset = offset;
+    if (watches.week) { if (watches.week.unsub) watches.week.unsub(); delete watches.week; }
+    state.weekEvents = null; state.weekErr = null; state.weekAt = null;
+    if (!weekCovered() && mcp) {
+      const ws = weekStart();
+      watches.week = {
+        server: GCAL, tool: "list_events",
+        input: { startTime: localISO(ws), endTime: localISO(addDays(ws, 7)), orderBy: "startTime", pageSize: 100 },
+        onData(payload, result) {
+          state.weekEvents = ((payload && payload.events) || []).map(parseEvent);
+          state.weekErr = null; state.weekAt = stampOf(result);
+          renderCal();
+        },
+        onError(err) {
+          const info = errorInfo(err, GCAL);
+          state.weekErr = info;
+          if (info.retract) state.weekEvents = null;
+          renderCal();
+        },
+      };
+      startWatch("week");
+    }
+    renderCal();
+  }
+
+  // ---------- Neuer Termin ----------
+  const dlg = $("#ev-dialog");
+  let creating = false;
+  let evDuration = 3600000;
+  const hm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  function evMsg(text) {
+    const m = $("#ev-msg");
+    m.textContent = text || "";
+    m.hidden = !text;
+  }
+  function syncAllDay() {
+    const all = $("#ev-allday").checked;
+    $("#ev-start").hidden = all;
+    $("#ev-end").hidden = all;
+  }
+  function readStart() {
+    const d = $("#ev-date").value, t = $("#ev-start").value || "00:00";
+    return d ? new Date(`${d}T${t}:00`) : null;
+  }
+  function readEnd() {
+    const d = $("#ev-end-date").value, t = $("#ev-end").value || "00:00";
+    return d ? new Date(`${d}T${t}:00`) : null;
+  }
+  function writeEnd(d) {
+    $("#ev-end-date").value = dayKey(d);
+    $("#ev-end").value = hm(d);
+  }
+
+  function openNewEvent(dk) {
+    const now = new Date();
+    const day = dk ? new Date(dk + "T00:00:00") : startOfDay(now);
+    let start;
+    if (dayDiff(day, now) === 0) { start = new Date(now); start.setMinutes(0, 0, 0); start.setHours(start.getHours() + 1); }
+    else { start = new Date(day); start.setHours(9, 0, 0, 0); }
+    evDuration = 3600000;
+    $("#ev-title").value = ""; $("#ev-location").value = ""; $("#ev-notes").value = "";
+    $("#ev-allday").checked = false;
+    $("#ev-date").value = dayKey(start); $("#ev-start").value = hm(start);
+    writeEnd(new Date(start.getTime() + evDuration));
+    syncAllDay(); evMsg("");
+    $("#ev-save").disabled = false; $("#ev-save").textContent = "Hinzufügen";
+    if (typeof dlg.showModal === "function") { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute("open", "");
+    $("#ev-title").focus();
+  }
+  function closeNewEvent() {
+    if (creating) return;
+    if (typeof dlg.close === "function") dlg.close(); else dlg.removeAttribute("open");
+  }
+
+  // Beginn verschieben verschiebt das Ende mit, wie in Apple Kalender.
+  for (const id of ["#ev-date", "#ev-start"]) {
+    $(id).addEventListener("change", () => {
+      const s0 = readStart();
+      if (s0 && isValid(s0)) writeEnd(new Date(s0.getTime() + evDuration));
+    });
+  }
+  for (const id of ["#ev-end-date", "#ev-end"]) {
+    $(id).addEventListener("change", () => {
+      const s0 = readStart(), e0 = readEnd();
+      if (s0 && e0 && e0 > s0) evDuration = e0 - s0;
+    });
+  }
+  $("#ev-allday").addEventListener("change", syncAllDay);
+  $("#ev-cancel").addEventListener("click", closeNewEvent);
+  dlg.addEventListener("cancel", (e) => { if (creating) e.preventDefault(); });
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) closeNewEvent(); });
+
+  function showToast(text) {
+    const t = $("#toast");
+    t.textContent = text; t.hidden = false;
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => { t.hidden = true; }, 2600);
+  }
+
+  $("#ev-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (creating) return;
+    if (!mcp) { evMsg("Termine lassen sich nur anlegen, wenn du die Seite in claude.ai öffnest."); return; }
+    const title = $("#ev-title").value.trim();
+    if (!title) { evMsg("Gib dem Termin einen Titel."); $("#ev-title").focus(); return; }
+    const sd = $("#ev-date").value;
+    const ed = $("#ev-end-date").value || sd;
+    if (!sd) { evMsg("Wähle ein Datum für den Beginn."); return; }
+    const allDay = $("#ev-allday").checked;
+    let input, firstDay;
+    if (allDay) {
+      if (ed < sd) { evMsg("Das Ende liegt vor dem Beginn."); return; }
+      // Google zählt das Ende ganztägiger Termine exklusiv: bis einschließlich ed heißt Ende am Folgetag 0 Uhr.
+      input = { summary: title, allDay: true, startTime: `${sd}T00:00:00`, endTime: `${dayKey(addDays(new Date(ed + "T00:00:00"), 1))}T00:00:00` };
+      firstDay = new Date(sd + "T00:00:00");
+    } else {
+      const st = $("#ev-start").value, et = $("#ev-end").value;
+      if (!st || !et) { evMsg("Gib Beginn und Ende mit Uhrzeit an."); return; }
+      const s0 = new Date(`${sd}T${st}:00`), e0 = new Date(`${ed}T${et}:00`);
+      if (!(e0 > s0)) { evMsg("Das Ende muss nach dem Beginn liegen."); return; }
+      input = { summary: title, startTime: `${sd}T${st}:00`, endTime: `${ed}T${et}:00` };
+      firstDay = s0;
+    }
+    const loc = $("#ev-location").value.trim();
+    const notes = $("#ev-notes").value.trim();
+    if (loc) input.location = loc;
+    if (notes) input.description = notes;
+
+    creating = true; evMsg("");
+    $("#ev-save").disabled = true; $("#ev-save").textContent = "Speichert …";
+    try {
+      await mcp.callTool(GCAL, "create_event", input);
+      creating = false;
+      closeNewEvent();
+      showToast("Termin hinzugefügt");
+      const offset = Math.floor(dayDiff(firstDay, new Date()) / 7);
+      if (offset !== state.weekOffset) setWeek(offset);
+      try { await mcp.invalidate(GCAL); } catch (err) {}
+    } catch (err) {
+      const code = err && err.code;
+      if (code === "approval_required" || code === "not_in_manifest" || code === "consent_required") {
+        evMsg("Die Seite darf noch keine Termine anlegen. Erlaube den Zugriff auf Google Kalender, wenn claude.ai danach fragt, und tippe dann noch einmal auf „Hinzufügen“.");
+      } else if (code === "needs_reauth" || code === "server_not_connected" || code === "selection_required" || code === "blocked_by_policy") {
+        evMsg(errorInfo(err, GCAL).text);
+      } else if (code === "tool_error") {
+        evMsg("Google Kalender hat den Termin abgelehnt. Prüfe die Angaben und versuch es erneut.");
+      } else {
+        evMsg("Unklar, ob der Termin angelegt wurde. Schau im Kalender nach, bevor du es noch einmal versuchst.");
+        try { await mcp.invalidate(GCAL); } catch (e2) {}
+      }
+    } finally {
+      creating = false;
+      $("#ev-save").disabled = false; $("#ev-save").textContent = "Hinzufügen";
+    }
+  });
 
   function relTo(ev, now) {
     if (ev.allDay) return dayDiff(ev.start, now) <= 0 ? "Heute" : shortDay(ev.start, now);
@@ -868,6 +1175,19 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
 
   // ---------- Ereignisse ----------
   document.addEventListener("click", (e) => {
+    const nav = e.target.closest("[data-weeknav]");
+    if (nav) {
+      const step = Number(nav.dataset.weeknav);
+      setWeek(step === 0 ? 0 : state.weekOffset + step);
+      return;
+    }
+    const nd = e.target.closest("[data-newday]");
+    if (nd && !e.target.closest(".blk")) { openNewEvent(nd.dataset.newday); return; }
+    if (e.target.closest("#cal-add")) {
+      const ws = weekStart();
+      openNewEvent(state.weekOffset === 0 ? null : dayKey(ws));
+      return;
+    }
     const t = e.target.closest("button");
     if (!t) return;
     if (t.dataset.tab) {
@@ -979,6 +1299,7 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
     if (k !== lastDay) {
       lastDay = k;
       if (mcp && watches.cal) { watches.cal.input = calInput(); startWatch("cal"); }
+      setWeek(state.weekOffset);
     }
     renderCal(); renderNextWidget(); renderTasks(); renderTaskWidget();
   }, 60000);
