@@ -149,6 +149,9 @@ main { padding-block: 22px 48px; display: grid; gap: 20px; }
 }
 .card-foot a { color: var(--blue); font-weight: 500; }
 .card-foot a:hover { text-decoration: underline; }
+.card-foot .grow { flex: 1; }
+.card-foot .link-btn { font-size: 13px; }
+.card-foot .link-btn.armed { color: var(--red); }
 
 /* Listen im iOS-Stil mit eingerückten Trennlinien */
 .list { list-style: none; margin: 0; padding: 0 0 4px; }
@@ -568,6 +571,8 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       <div id="mail-body"></div>
       <div class="card-foot">
         <span id="mail-fresh"></span>
+        <span class="grow"></span>
+        <button type="button" class="link-btn" id="mail-reset" title="Ungelesen-Zähler auf 0 setzen">Zähler zurücksetzen</button>
         <a href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener">In Gmail öffnen</a>
       </div>
     </article>
@@ -1182,13 +1187,13 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     for (const b of document.querySelectorAll("[data-tab]")) b.setAttribute("aria-selected", String(b.dataset.tab === state.mailTab));
     const loaded = state.unread !== null || state.inbox !== null;
     $("#mail-fresh").textContent = loaded ? freshText(state.mailAt) : "";
-    $("#mail-meta").textContent = state.unreadTotal != null ? `${fmtNum(state.unreadTotal)} ungelesen` : "Posteingang";
+    $("#mail-meta").textContent = state.unreadTotal != null ? `${fmtNum(state.unreadTotal)}${state.unreadMore ? "+" : ""} ungelesen seit ${sinceLabel()}` : "Posteingang";
     const notice = noticeHTML(state.mailErr, GMAIL);
     const source = state.mailTab === "unread" ? state.unread : state.inbox;
     if (!source) { body.innerHTML = notice || SKELETON; return; }
     if (!source.length) {
       body.innerHTML = notice + (state.mailTab === "unread"
-        ? '<div class="empty"><strong>Alles gelesen</strong>Im Posteingang wartet keine ungelesene Mail.</div>'
+        ? `<div class="empty"><strong>Alles gelesen</strong>Seit ${esc(sinceLabel())} ist keine ungelesene Mail dazugekommen.</div>`
         : '<div class="empty"><strong>Posteingang leer</strong>Hier ist gerade nichts.</div>');
       return;
     }
@@ -1218,8 +1223,11 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       return;
     }
     const latest = (state.unread || [])[0];
-    const sub = latest ? `Zuletzt: ${parseSender((latest.messages || [])[0]?.sender).display}` : "Keine ungelesenen Mails";
-    el.innerHTML = head + `<div class="widget-big">${fmtNum(state.unreadTotal)}</div><div class="widget-sub">ungelesen im Posteingang${latest ? " · " + esc(sub) : ""}</div>`;
+    const n = state.unreadTotal;
+    const sub = n
+      ? `ungelesen seit ${esc(sinceLabel())} · zuletzt ${esc(parseSender((latest.messages || [])[(latest.messages || []).length - 1]?.sender).display)}`
+      : `Alles gelesen · gezählt seit ${esc(sinceLabel())}`;
+    el.innerHTML = head + `<div class="widget-big"${n ? "" : ' style="color:var(--green)"'}>${fmtNum(n)}${state.unreadMore ? "+" : ""}</div><div class="widget-sub">${sub}</div>`;
   }
 
   // ---------- Aufgaben ----------
@@ -1501,11 +1509,13 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       renderMail(); renderMailWidget();
     };
     watches.unread = {
-      server: GMAIL, tool: "search_threads", input: { query: "in:inbox is:unread", pageSize: 15 },
+      server: GMAIL, tool: "search_threads", input: null,
       onData(payload, result) {
-        state.unread = (payload && payload.threads) || [];
-        const est = payload && payload.resultCountEstimate;
-        state.unreadTotal = est != null ? Number(est) : state.unread.length;
+        const ign = (state.mailSince && state.mailSince.ignore) || {};
+        const all = (payload && payload.threads) || [];
+        state.unread = all.filter((t) => !(ign[t.id] >= (t.messageCount || 1)));
+        state.unreadTotal = state.unread.length;
+        state.unreadMore = all.length >= 50 && !!(payload && payload.nextPageToken);
         state.mailErr = null; state.mailAt = stampOf(result);
         renderMail(); renderMailWidget(); renderUpdated();
       },
@@ -1522,6 +1532,62 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     };
   }
 
+  // ---------- Ungelesen-Zähler: zählt erst ab dem Zurücksetzen ----------
+  state.mailSince = undefined;
+  const gmailDate = (d) => `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+  const sinceLabel = () => {
+    const ms = state.mailSince;
+    if (!ms || !ms.date) return "";
+    return new Date(ms.date.replace(/\//g, "-") + "T00:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+  };
+  function startUnreadWatch() {
+    if (!mcp || !watches.unread || !state.mailSince) return;
+    const q = { query: `in:inbox is:unread after:${state.mailSince.date}`, pageSize: 50 };
+    if (watches.unread.unsub && JSON.stringify(watches.unread.input) === JSON.stringify(q)) return;
+    watches.unread.input = q;
+    startWatch("unread");
+  }
+  let resetting = false;
+  async function resetMailCount() {
+    if (resetting || !mcp) return;
+    resetting = true;
+    const date = gmailDate(new Date());
+    const ignore = {};
+    try {
+      const r = await mcp.callTool(GMAIL, "search_threads", { query: `in:inbox is:unread after:${date}`, pageSize: 50 }, { cache: false });
+      for (const t of (r.payload && r.payload.threads) || []) ignore[t.id] = t.messageCount || 1;
+    } catch (e) {
+      resetting = false;
+      showToast("Zurücksetzen hat nicht geklappt. Prüfe die Gmail-Verbindung.");
+      return;
+    }
+    const doc = { date, ignore, at: Date.now() };
+    state.mailSince = doc;
+    try { localStorage.setItem("mailSince", JSON.stringify(doc)); } catch (e) {}
+    if (finCols) await finWrite(() => finCols.meta.doc("mail").set(doc));
+    state.unread = null; state.unreadTotal = null;
+    renderMail(); renderMailWidget();
+    if (watches.unread) { watches.unread.input = null; if (watches.unread.unsub) watches.unread.unsub(); watches.unread.unsub = null; }
+    startUnreadWatch();
+    resetting = false;
+  }
+  function mailSinceFallback() {
+    if (state.mailSince !== undefined) return;
+    try { const v = JSON.parse(localStorage.getItem("mailSince") || "null"); if (v && v.date) { state.mailSince = v; startUnreadWatch(); return; } } catch (e) {}
+    state.mailSince = null;
+    resetMailCount();
+  }
+  $("#mail-reset").addEventListener("click", (e) => {
+    const b = e.currentTarget;
+    if (!b.classList.contains("armed")) {
+      b.classList.add("armed"); b.textContent = "Wirklich auf 0 setzen?";
+      setTimeout(() => { b.classList.remove("armed"); b.textContent = "Zähler zurücksetzen"; }, 3500);
+      return;
+    }
+    b.classList.remove("armed"); b.textContent = "Zähler zurücksetzen";
+    resetMailCount().then(() => showToast("Mail-Zähler steht auf 0"));
+  });
+
   function startWatch(key) {
     const w = watches[key];
     if (w.unsub) w.unsub();
@@ -1534,7 +1600,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
   async function approve(server, btn) {
     if (!mcp) return;
     btn.disabled = true;
-    for (const w of Object.values(watches).filter((x) => x.server === server)) {
+    for (const w of Object.values(watches).filter((x) => x.server === server && x.input)) {
       try {
         const r = await mcp.callTool(w.server, w.tool, w.input);
         w.onData(r.payload, r);
@@ -1655,12 +1721,12 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
   async function initFinance(db, user) {
     if (!db || !user) {
       state.finErr = "Finanzen lassen sich nur speichern, wenn du die Seite angemeldet in claude.ai öffnest.";
-      state.wx = null; maybeFetchWeather();
+      state.wx = null; maybeFetchWeather(); mailSinceFallback();
       renderFinance(); return;
     }
     let uid = null;
     try { uid = await user.id(); } catch (e) {}
-    if (!uid) { state.finErr = "Melde dich in claude.ai an, um deine Finanzen zu sehen."; state.wx = null; maybeFetchWeather(); renderFinance(); return; }
+    if (!uid) { state.finErr = "Melde dich in claude.ai an, um deine Finanzen zu sehen."; state.wx = null; maybeFetchWeather(); mailSinceFallback(); renderFinance(); return; }
     const base = db.doc(`data/users/${uid}/dashboard`);
     finCols = { tx: base.collection("tx"), budgets: base.collection("budgets"), fixed: base.collection("fixed"), goals: base.collection("goals"), depot: base.collection("depot"), meta: base.collection("meta"), plans: base.collection("plans"), exec: base.collection("exec") };
     const docsOf = (snap) => snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
@@ -1681,6 +1747,17 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       state.hist = h;
       renderDepot(); maybeFetchHist(); runPlans();
     }, onErr);
+    finCols.meta.doc("mail").onSnapshot((snap) => {
+      if (snap.exists && snap.data() && snap.data().date) {
+        const d = snap.data();
+        const changed = !state.mailSince || state.mailSince.at !== d.at;
+        state.mailSince = d;
+        if (changed && watches.unread) { if (watches.unread.unsub) watches.unread.unsub(); watches.unread.unsub = null; startUnreadWatch(); }
+      } else if (state.mailSince === undefined) {
+        state.mailSince = null;
+        resetMailCount();
+      }
+    }, () => mailSinceFallback());
     finCols.meta.doc("weather").onSnapshot((snap) => {
       if (snap.exists) state.wx = snap.data(); else if (state.wx === undefined) state.wx = null;
       renderWeather(); maybeFetchWeather();
@@ -3112,7 +3189,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       } catch (e) {}
     }
     defineWatches();
-    startWatch("cal"); startWatch("unread"); startWatch("inbox");
+    startWatch("cal"); startUnreadWatch(); startWatch("inbox");
     maybeFetchWeather();
   })();
 })();
