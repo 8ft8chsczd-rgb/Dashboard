@@ -288,6 +288,27 @@ details.tbl th { font-weight: 600; color: var(--label-2); }
 }
 .danger { color: var(--red); font-weight: 500; justify-self: center; font-size: 15px; padding: 4px 10px; }
 
+/* Depot */
+.stack { display: grid; gap: 20px; align-content: start; min-width: 0; }
+.depot-sum { padding: 0 18px 12px; display: grid; gap: 4px; }
+.depot-pl { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 2px; font-size: 14px; color: var(--label-2); }
+.depot-pl .money { font-weight: 600; }
+.pl-up { color: var(--green); }
+.pl-down { color: var(--red); }
+.pos { --inset: 40px; width: 100%; text-align: left; align-items: center; }
+.pos .row-title { font-weight: 500; }
+.pos-right { display: grid; justify-items: end; font-size: 13px; color: var(--label-2); flex-shrink: 0; }
+.pos-right .money:first-child { font-size: 15px; color: var(--label); font-weight: 500; }
+#depot-refresh.spin svg { animation: spin .8s linear infinite; }
+.hint-txt { font-size: 13px; color: var(--label-2); padding: 0 4px; }
+.sym-res { display: grid; background: var(--group); border-radius: 12px; overflow: hidden; }
+.sym-res button { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 12px; text-align: left; width: 100%; }
+.sym-res button + button { border-top: 0.5px solid var(--sep); }
+.sym-res button:hover { background: var(--fill-2); }
+.sym-res b { display: block; font-weight: 600; font-size: 14px; }
+.sym-res small { display: block; font-size: 12px; color: var(--label-2); }
+.sym-row input.r { flex: 1 1 100px; }
+
 /* Neuer Termin: Sheet im Stil von Apple Kalender */
 dialog.sheet-dlg {
   border: 0; padding: 0; border-radius: 16px; background: var(--sheet); color: var(--label);
@@ -564,6 +585,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       </div>
         <div id="fin-budget"></div>
       </article>
+<div class="stack">
       <article class="card" aria-labelledby="fin-trend-title">
       <div class="card-head">
         <div class="app-icon fin" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 20v-7M10 20V8M14 20v-5M18 20V5"/></svg></div>
@@ -576,6 +598,19 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
         <div class="chart" id="fin-trend"></div>
         <details class="tbl"><summary>Als Tabelle anzeigen</summary><div class="tbl-wrap" id="fin-trend-table"></div></details>
       </article>
+      <article class="card" aria-labelledby="fin-depot-title">
+        <div class="card-head">
+          <div class="app-icon fin" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m4 16 5-5 4 3 7-8"/><path d="M15 6h5v5"/></svg></div>
+          <div class="grow">
+            <div class="card-title" id="fin-depot-title">Depot</div>
+            <div class="card-meta" id="fin-depot-meta">Aktien und ETFs</div>
+          </div>
+          <button type="button" class="icon-btn sm" id="depot-refresh" data-depotrefresh="1" aria-label="Kurse abrufen" title="Kurse abrufen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
+          <button type="button" class="icon-btn sm" data-finadd="pos" aria-label="Position hinzufügen" title="Position hinzufügen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+        <div id="fin-depot"></div>
+      </article>
+      </div>
     </section>
     <section class="cards">
       <article class="card" aria-labelledby="fin-tx-title">
@@ -678,7 +713,8 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     mailTab: "unread",
     tasks: null, tasksErr: null, tasksReadOnly: false, showDone: false, editing: null,
     view: "uebersicht",
-    fin: { tx: null, budgets: null, fixed: null, goals: null }, finErr: null, finReadOnly: false,
+    fin: { tx: null, budgets: null, fixed: null, goals: null, depot: null }, finErr: null, finReadOnly: false,
+    depotQuotes: undefined, depotErr: null,
     finMonth: { y: new Date().getFullYear(), m: new Date().getMonth() },
   };
   try { const t = localStorage.getItem("mailTab"); if (t === "inbox" || t === "unread") state.mailTab = t; } catch (e) {}
@@ -1461,7 +1497,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     try { uid = await user.id(); } catch (e) {}
     if (!uid) { state.finErr = "Melde dich in claude.ai an, um deine Finanzen zu sehen."; renderFinance(); return; }
     const base = db.doc(`data/users/${uid}/dashboard`);
-    finCols = { tx: base.collection("tx"), budgets: base.collection("budgets"), fixed: base.collection("fixed"), goals: base.collection("goals") };
+    finCols = { tx: base.collection("tx"), budgets: base.collection("budgets"), fixed: base.collection("fixed"), goals: base.collection("goals"), depot: base.collection("depot"), meta: base.collection("meta") };
     const docsOf = (snap) => snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
     const onErr = (e) => {
       state.finErr = e && e.code === "revoked" ? "Der Zugriff auf die Finanzen wurde beendet." : "Die Finanzdaten sind gerade nicht erreichbar. Lade die Seite neu.";
@@ -1471,6 +1507,11 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     finCols.budgets.onSnapshot((snap) => { state.fin.budgets = docsOf(snap); renderFinance(); }, onErr);
     finCols.fixed.onSnapshot((snap) => { state.fin.fixed = docsOf(snap); renderFinance(); }, onErr);
     finCols.goals.onSnapshot((snap) => { state.fin.goals = docsOf(snap); renderFinance(); }, onErr);
+    finCols.depot.onSnapshot((snap) => { state.fin.depot = docsOf(snap); renderDepot(); maybeFetchQuotes(); }, onErr);
+    finCols.meta.doc("quotes").onSnapshot((snap) => {
+      state.depotQuotes = snap.exists ? snap.data() : null;
+      renderDepot(); maybeFetchQuotes();
+    }, onErr);
   }
 
   // ---------- Finanzen: Darstellung ----------
@@ -1489,7 +1530,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     const nOut = st.txs.length - nIn;
     $("#fw-in").innerHTML = widget("var(--green)", "Einnahmen", esc(eur(st.income)), `${nIn} ${nIn === 1 ? "Buchung" : "Buchungen"}`);
     $("#fw-out").innerHTML = widget("var(--orange)", "Ausgaben", esc(eur(st.expense)),
-      totalBudget ? `${Math.round((spentBudgeted / totalBudget) * 100)} % der Budgets genutzt (${esc(eur0(spentBudgeted))} von ${esc(eur0(totalBudget))})` : `${nOut} ${nOut === 1 ? "Buchung" : "Buchungen"}`);
+      totalBudget ? `${Math.round((spentBudgeted / totalBudget) * 100)} % der Budgets (${esc(eur0(spentBudgeted))} von ${esc(eur0(totalBudget))})` : `${nOut} ${nOut === 1 ? "Buchung" : "Buchungen"}`);
     const bal = st.income - st.expense;
     $("#fw-bal").innerHTML = widget(bal < 0 ? "var(--red)" : "var(--blue)", "Saldo", `${bal > 0 ? "+" : bal < 0 ? "−" : ""}${esc(eur(Math.abs(bal)))}`,
       bal > 0 ? "Überschuss in diesem Monat" : bal < 0 ? "Mehr ausgegeben als eingenommen" : "Ausgeglichen");
@@ -1708,6 +1749,8 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     $("#fin-now").disabled = sameYM(ym, nowYM());
     $("#fin-notice").innerHTML = state.finErr ? `<div class="notice soft" role="status" style="margin:0"><span>${esc(state.finErr)}</span></div>` : "";
     for (const b of document.querySelectorAll("[data-finadd]")) b.disabled = !finCols || state.finReadOnly;
+    renderDepot();
+    maybeFetchQuotes();
     if (!finLoaded()) {
       const sk = state.finErr ? "" : SKELETON;
       for (const id of ["#fin-budget", "#fin-trend", "#fin-tx", "#fin-fixed", "#fin-goals"]) $(id).innerHTML = sk;
@@ -1743,7 +1786,10 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     if (f.type === "select") input = `<select id="${id}">${optionsHTML(f.options, f.value)}</select>`;
     else if (f.type === "date") input = `<input type="date" id="${id}" value="${esc(f.value || "")}">`;
     else if (f.type === "amount") input = `<input type="text" class="r money" id="${id}" inputmode="decimal" placeholder="0,00 €" value="${esc(f.value || "")}">`;
-    else input = `<input type="text" class="r" id="${id}" maxlength="120" placeholder="${esc(f.placeholder || "")}" value="${esc(f.value || "")}">`;
+    else if (f.type === "symbol") {
+      return `<div class="grow-row sym-row"><label for="${id}">${esc(f.label)}</label><input type="text" class="r" id="${id}" maxlength="40" placeholder="Name, Kürzel oder ISIN" value="${esc(f.value || "")}" autocapitalize="characters" spellcheck="false"><button type="button" class="mini" data-symsearch="1">Suchen</button></div>`;
+    }
+    else input = `<input type="text" class="r" id="${id}" maxlength="120" placeholder="${esc(f.placeholder || "")}" value="${esc(f.value || "")}"${f.inputmode ? ` inputmode="${f.inputmode}"` : ""}>`;
     return `<div class="grow-row"><label for="${id}">${esc(f.label)}</label>${input}</div>`;
   }
 
@@ -1757,7 +1803,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     $("#fin-save").disabled = false;
     const segs = cfg.fields.filter((f) => f.type === "seg");
     const rest = cfg.fields.filter((f) => f.type !== "seg");
-    $("#fin-fields").innerHTML = segs.map(fieldHTML).join("") + `<div class="group">${rest.map(fieldHTML).join("")}</div>`;
+    $("#fin-fields").innerHTML = segs.map(fieldHTML).join("") + `<div class="group">${rest.map(fieldHTML).join("")}</div>` + (cfg.after || "");
     finMsg("");
     const del = $("#fin-del");
     del.hidden = !cfg.onDelete;
@@ -1931,6 +1977,275 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     });
   }
 
+  // ---------- Finanzen: Depot (Kurse live über Firecrawl / Yahoo Finance) ----------
+  const FIRECRAWL = "Firecrawl";
+  const QUOTE_TTL = 3600000;
+  const SYMBOL_RE = /^[A-Za-z0-9^][A-Za-z0-9.=^&\-]{0,19}$/;
+  let depotFetching = false;
+  const normCur = (c) => (c === "GBp" || c === "GBX" ? "GBP" : c || "EUR");
+
+  function depotSymbols() {
+    return [...new Set((state.fin.depot || []).map((p) => String(p.symbol || "").toUpperCase()).filter(Boolean))].sort();
+  }
+  function quotesStale() {
+    const q = state.depotQuotes;
+    return !q || Date.now() - (q.at || 0) > QUOTE_TTL;
+  }
+  function missingSymbols() {
+    const q = state.depotQuotes || {};
+    const known = q.q || {};
+    const failed = q.missing || [];
+    return depotSymbols().filter((s) => !known[s] && !failed.includes(s));
+  }
+
+  async function firecrawl(items, fresh) {
+    const res = await mcp.callTool(FIRECRAWL, "firecrawl_scrape", {
+      alexandria: items,
+      objective: "Aktuelle Kurse für das private Depot im Dashboard abrufen",
+    }, { cache: fresh ? false : { staleTime: QUOTE_TTL, gcTime: QUOTE_TTL } });
+    const p = res && res.payload;
+    return (p && p.data && Array.isArray(p.data.alexandria)) ? p.data.alexandria : [];
+  }
+  async function quoteBatch(symbols, fresh) {
+    const out = {};
+    for (let i = 0; i < symbols.length; i += 10) {
+      const chunk = symbols.slice(i, i + 10);
+      const arr = await firecrawl(chunk.map((s) => ({ provider: "finance-yahoo-com", capability: "equities/quote", options: { symbol: s } })), fresh);
+      chunk.forEach((s, j) => {
+        const hit = arr.find((a) => a && a.data && String(a.data.symbol || "").toUpperCase() === s) || arr[j];
+        out[s] = hit && hit.data && typeof hit.data.price === "number" ? hit.data : null;
+      });
+    }
+    return out;
+  }
+
+  function depotErrText(e) {
+    switch (e && e.code) {
+      case "server_not_connected":
+      case "server_not_found":
+        return "Firecrawl ist nicht verbunden. Füge den Konnektor unter claude.ai → Einstellungen → Konnektoren hinzu und tippe dann auf „Kurse abrufen“.";
+      case "needs_reauth":
+        return "Die Verbindung zu Firecrawl ist abgelaufen. Verbinde Firecrawl neu unter claude.ai → Einstellungen → Konnektoren.";
+      case "selection_required":
+        return "Du hast mehrere Firecrawl-Konnektoren. Wähle in claude.ai aus, welcher hier genutzt werden soll.";
+      case "approval_required":
+      case "not_in_manifest":
+      case "consent_required":
+        return "Die Seite braucht deine Erlaubnis, Kurse über Firecrawl abzurufen. Tippe auf „Kurse abrufen“ und erlaube den Zugriff.";
+      case "blocked_by_policy":
+        return "Deine Organisation erlaubt Firecrawl hier nicht.";
+      case "tool_error":
+        return "Firecrawl hat die Anfrage abgelehnt. Prüfe dein Firecrawl-Guthaben und versuch es später erneut.";
+      case "not_granted":
+      case "capability_disabled":
+      case "capability_removed":
+        return "Kurse lassen sich nur abrufen, wenn du die Seite in claude.ai öffnest.";
+      default:
+        return "Firecrawl ist gerade nicht erreichbar. Die zuletzt geladenen Kurse bleiben stehen.";
+    }
+  }
+
+  async function fetchQuotes(force) {
+    if (depotFetching || !finCols) return;
+    if (!mcp) { state.depotErr = depotErrText({ code: "not_granted" }); renderDepot(); return; }
+    const syms = depotSymbols();
+    if (!syms.length) return;
+    const prev = state.depotQuotes || {};
+    const stale = force || quotesStale();
+    const targets = stale ? syms : missingSymbols();
+    if (!targets.length) return;
+    depotFetching = true; state.depotErr = null; renderDepot();
+    try {
+      const got = await quoteBatch(targets, force);
+      const q = {};
+      const missing = [];
+      for (const s of syms) {
+        if (got[s]) {
+          const d = got[s];
+          q[s] = {
+            price: d.price, currency: d.currency || "EUR", cp: typeof d.change_percent === "number" ? d.change_percent : 0,
+            name: d.name || d.short_name || s, delayed: d.regular_market_source === "DELAYED", time: d.market_time_ms || null,
+          };
+        } else if (prev.q && prev.q[s]) q[s] = prev.q[s];
+        if (targets.includes(s) && !got[s]) missing.push(s);
+      }
+      const fx = stale ? {} : Object.assign({}, prev.fx || {});
+      const curs = [...new Set(Object.values(q).map((x) => normCur(x.currency)).filter((c) => c !== "EUR" && !fx[c]))];
+      if (curs.length) {
+        const fxGot = await quoteBatch(curs.map((c) => `EUR${c}=X`), force);
+        for (const c of curs) { const d = fxGot[`EUR${c}=X`]; if (d) fx[c] = d.price; }
+      }
+      const doc = { at: stale ? Date.now() : prev.at || Date.now(), q, fx, missing };
+      state.depotQuotes = doc;
+      await finWrite(() => finCols.meta.doc("quotes").set(doc));
+    } catch (e) {
+      state.depotErr = depotErrText(e);
+    }
+    depotFetching = false;
+    renderDepot();
+  }
+
+  function maybeFetchQuotes() {
+    if (state.view !== "finanzen" || depotFetching || state.depotErr || !state.fin.depot || state.depotQuotes === undefined) return;
+    if (!depotSymbols().length) return;
+    if (quotesStale() || missingSymbols().length) fetchQuotes(false);
+  }
+
+  function toEur(amount, cur, fx) {
+    if (cur === "EUR") return amount;
+    if (cur === "GBp" || cur === "GBX") return fx.GBP ? amount / 100 / fx.GBP : null;
+    return fx[cur] ? amount / fx[cur] : null;
+  }
+  function fmtNative(price, cur) {
+    if (cur === "GBp" || cur === "GBX") return `${price.toLocaleString("de-DE", { maximumFractionDigits: 2 })} p`;
+    try { return new Intl.NumberFormat("de-DE", { style: "currency", currency: cur }).format(price); }
+    catch (e) { return `${price.toLocaleString("de-DE")} ${cur}`; }
+  }
+  const signed = (c) => `${c > 0 ? "+" : c < 0 ? "−" : ""}${eur(Math.abs(c))}`;
+  const pctTxt = (x) => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x * 100).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
+  const qtyTxt = (n) => Number(n).toLocaleString("de-DE", { maximumFractionDigits: 6 });
+
+  function positionRows() {
+    const qd = state.depotQuotes || {};
+    const quotes = qd.q || {};
+    const fx = qd.fx || {};
+    const byAge = [...(state.fin.depot || [])].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    return byAge.map((p, i) => {
+      const sym = String(p.symbol || "").toUpperCase();
+      const q = quotes[sym];
+      const cost = Math.round((p.qty || 0) * (p.buyPrice || 0));
+      const priceEur = q ? toEur(q.price, q.currency, fx) : null;
+      const value = priceEur != null ? Math.round((p.qty || 0) * priceEur * 100) : null;
+      const day = priceEur != null && q.cp ? Math.round((p.qty || 0) * (priceEur - priceEur / (1 + q.cp)) * 100) : 0;
+      return {
+        p, sym, q, cost, value, day,
+        color: i < 7 ? `var(--c${i + 1})` : "var(--c-other)",
+        name: p.name || (q && q.name) || sym,
+      };
+    });
+  }
+
+  function renderDepot() {
+    const box = $("#fin-depot");
+    if (!box || state.view !== "finanzen") return;
+    const qd = state.depotQuotes || {};
+    $("#depot-refresh").disabled = depotFetching || !finCols || !depotSymbols().length;
+    $("#depot-refresh").classList.toggle("spin", depotFetching);
+    if (!state.fin.depot) { box.innerHTML = state.finErr ? "" : SKELETON; return; }
+    const rows = positionRows();
+    const nSym = depotSymbols().length;
+    const fresh = qd.at ? `Kurse von ${fmtTime(new Date(qd.at))} Uhr` : "Noch keine Kurse";
+    $("#fin-depot-meta").textContent = rows.length ? `${rows.length} ${rows.length === 1 ? "Position" : "Positionen"} · ${depotFetching ? "Kurse werden geladen …" : fresh}` : "Aktien und ETFs";
+    const notice = state.depotErr
+      ? `<div class="notice" role="status"><span>${esc(state.depotErr)}</span><button type="button" data-depotrefresh="1">Kurse abrufen</button></div>`
+      : "";
+    if (!rows.length) {
+      box.innerHTML = notice + '<div class="empty"><strong>Noch keine Positionen</strong>Füge mit „+“ deine Aktien und ETFs hinzu. Die Kurse kommen dann live über Firecrawl.</div>';
+      return;
+    }
+    const priced = rows.filter((r) => r.value != null);
+    const value = rows.reduce((a, r) => a + (r.value != null ? r.value : r.cost), 0);
+    const costPriced = priced.reduce((a, r) => a + r.cost, 0);
+    const pl = priced.reduce((a, r) => a + (r.value - r.cost), 0);
+    const day = priced.reduce((a, r) => a + r.day, 0);
+    const dayBase = priced.reduce((a, r) => a + (r.value - r.day), 0);
+    const cls = (x) => (x > 0 ? "pl-up" : x < 0 ? "pl-down" : "");
+    let html = notice + `<div class="depot-sum">
+      <div class="widget-big money">${esc(eur(value))}</div>
+      ${priced.length ? `<div class="depot-pl"><span class="money ${cls(pl)}">${esc(signed(pl))} (${esc(pctTxt(costPriced ? pl / costPriced : 0))})</span><span>seit Kauf</span>
+        <span class="money ${cls(day)}">${esc(signed(day))} (${esc(pctTxt(dayBase ? day / dayBase : 0))})</span><span>heute</span></div>`
+        : `<div class="widget-sub">${depotFetching ? "Kurse werden geladen …" : "Wert zum Kaufkurs, bis die Kurse geladen sind"}</div>`}
+    </div>`;
+    const shares = rows.map((r) => ({ r, v: r.value != null ? r.value : r.cost })).filter((x) => x.v > 0);
+    const folded = shares.filter((x) => x.r.color === "var(--c-other)").reduce((a, x) => a + x.v, 0);
+    const named = shares.filter((x) => x.r.color !== "var(--c-other)");
+    if (value > 0) {
+      html += `<div class="stackbar" role="img" aria-label="Aufteilung des Depots">${named.map((x) =>
+        `<span style="--cat:${x.r.color};flex:${x.v} 1 0" title="${esc(x.r.name)}: ${esc(eur(x.v))} (${Math.round((x.v / value) * 100)} %)"></span>`).join("")}${folded ? `<span style="--cat:var(--c-other);flex:${folded} 1 0" title="Weitere: ${esc(eur(folded))}"></span>` : ""}</div>`;
+    }
+    html += '<ul class="list">' + rows.map((r) => {
+      const share = value ? Math.round(((r.value != null ? r.value : r.cost) / value) * 100) : 0;
+      const priceTxt = r.q ? `${fmtNative(r.q.price, r.q.currency)}` : ((qd.missing || []).includes(r.sym) ? "Kurs nicht gefunden" : "Kurs fehlt");
+      const right = r.value != null
+        ? `<span class="money">${esc(eur(r.value))}</span><span class="money ${cls(r.value - r.cost)}">${esc(pctTxt(r.cost ? (r.value - r.cost) / r.cost : 0))}</span>`
+        : `<span class="money">${esc(eur(r.cost))}</span><span>Kaufwert</span>`;
+      return `<li><button type="button" class="row pos hoverable" data-posid="${esc(r.p.id)}" style="--cat:${r.color}">
+        <span class="cat-dot"></span>
+        <span class="row-main"><span class="row-title" style="display:block">${esc(r.name)}</span>
+          <span class="row-sub" style="display:block">${esc(qtyTxt(r.p.qty))} Stk · ${esc(r.sym)} · ${esc(priceTxt)} · ${share} %</span></span>
+        <span class="pos-right">${right}</span>
+      </button></li>`;
+    }).join("") + "</ul>";
+    const delayed = Object.values(qd.q || {}).some((x) => x.delayed);
+    html += `<div class="card-foot"><span>Yahoo Finance über Firecrawl${delayed ? ", teils 15 Min. verzögert" : ""} · je Abruf ca. ${nSym * 5} Credits</span></div>`;
+    box.innerHTML = html;
+  }
+
+  function parseQty(v) {
+    const t = String(v || "").trim().replace(/\s/g, "").replace(",", ".");
+    if (!/^\d+(\.\d{1,6})?$/.test(t)) return null;
+    const n = parseFloat(t);
+    return n > 0 ? n : null;
+  }
+
+  function openPosSheet(p) {
+    openSheet({
+      title: p ? "Position bearbeiten" : "Neue Position",
+      submit: p ? "Sichern" : "Hinzufügen",
+      done: p ? "Position gesichert" : "Position hinzugefügt",
+      fields: [
+        { id: "symbol", type: "symbol", label: "Symbol", value: p ? p.symbol : "" },
+        { id: "name", type: "text", label: "Name", placeholder: "z. B. SAP", value: p ? p.name || "" : "" },
+        { id: "qty", type: "text", label: "Stückzahl", placeholder: "z. B. 10", value: p ? String(p.qty).replace(".", ",") : "", inputmode: "decimal" },
+        { id: "buy", type: "amount", label: "Kaufkurs je Stück", value: p ? toInput(p.buyPrice) : "" },
+      ],
+      after: '<div class="hint-txt">Tipp: Für Kurse direkt in Euro die Xetra-Notierung nehmen, also Symbole mit der Endung .DE (z. B. SAP.DE). Die Suche kostet ca. 5 Firecrawl-Credits.</div><div id="sym-results"></div>',
+      check(v) {
+        const symbol = v.symbol.trim().toUpperCase();
+        if (!SYMBOL_RE.test(symbol)) return "Gib ein gültiges Symbol ein, zum Beispiel SAP.DE, oder nutze die Suche.";
+        const qty = parseQty(v.qty);
+        if (!qty) return "Gib eine Stückzahl größer als 0 ein, zum Beispiel 10 oder 2,5.";
+        const buyPrice = needAmount(v.buy);
+        if (!buyPrice) return "Gib den Kaufkurs je Stück in Euro ein, zum Beispiel 182,40.";
+        return { symbol, name: v.name.trim(), qty, buyPrice };
+      },
+      save: (d) => (p ? finCols.depot.doc(p.id).update(d) : finCols.depot.add(Object.assign(d, { createdAt: Date.now() }))),
+      onDelete: p ? () => finCols.depot.doc(p.id).delete() : null,
+    });
+  }
+
+  async function searchSymbol(btn) {
+    const box = $("#sym-results");
+    const query = ($("#f-symbol").value.trim() || $("#f-name").value.trim());
+    if (!query) { box.innerHTML = '<div class="hint-txt">Gib zuerst einen Namen, ein Kürzel oder eine ISIN ins Feld „Symbol“ ein.</div>'; return; }
+    if (!mcp) { box.innerHTML = `<div class="hint-txt">${esc(depotErrText({ code: "not_granted" }))}</div>`; return; }
+    btn.disabled = true; btn.textContent = "Sucht …";
+    try {
+      const arr = await firecrawl([{ provider: "finance-yahoo-com", capability: "equities/search", options: { query, count: 8, quote_types: ["EQUITY", "ETF", "MUTUALFUND"] } }], false);
+      const results = (arr[0] && arr[0].data && arr[0].data.results) || [];
+      box.innerHTML = results.length
+        ? `<div class="sym-res" role="list">${results.map((r) =>
+            `<button type="button" role="listitem" data-sympick="${esc(r.symbol)}" data-symname="${esc(r.name || r.short_name || "")}">
+              <span><b>${esc(r.name || r.short_name || r.symbol)}</b><small>${esc(r.exchange_name || r.exchange || "")} · ${esc(r.quote_type || "")}</small></span><span class="money">${esc(r.symbol)}</span>
+            </button>`).join("")}</div>`
+        : '<div class="hint-txt">Nichts gefunden. Probier den Firmennamen oder das Börsenkürzel.</div>';
+    } catch (e) {
+      box.innerHTML = `<div class="hint-txt">${esc(depotErrText(e))}</div>`;
+    }
+    btn.disabled = false; btn.textContent = "Suchen";
+  }
+  finDlg.addEventListener("click", (e) => {
+    const sb = e.target.closest("[data-symsearch]");
+    if (sb) { searchSymbol(sb); return; }
+    const pick = e.target.closest("[data-sympick]");
+    if (pick) {
+      $("#f-symbol").value = pick.dataset.sympick;
+      if (!$("#f-name").value.trim()) $("#f-name").value = pick.dataset.symname;
+      $("#sym-results").innerHTML = "";
+      $("#f-qty").focus();
+    }
+  });
+
   $("#view-finanzen").addEventListener("click", async (e) => {
     const b = e.target.closest("button");
     if (!b || b.disabled) return;
@@ -1944,11 +2259,16 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       if (d.finadd === "tx") openTxSheet(null);
       else if (d.finadd === "fixed") openFixedSheet(null);
       else if (d.finadd === "goal") openGoalSheet(null);
+      else if (d.finadd === "pos") openPosSheet(null);
+    } else if (d.depotrefresh) {
+      state.depotErr = null;
+      fetchQuotes(true);
     } else if (state.finReadOnly) {
       return;
     } else if (d.txid) { const t = byId("tx", d.txid); if (t) openTxSheet(t); }
     else if (d.fixedid) { const f = byId("fixed", d.fixedid); if (f) openFixedSheet(f); }
     else if (d.goalid) { const g = byId("goals", d.goalid); if (g) openGoalSheet(g); }
+    else if (d.posid) { const p = byId("depot", d.posid); if (p) openPosSheet(p); }
     else if (d.deposit) { const g = byId("goals", d.deposit); if (g) openDepositSheet(g); }
     else if (d.budget && finCols) openBudgetSheet(d.budget);
     else if (d.book) {
