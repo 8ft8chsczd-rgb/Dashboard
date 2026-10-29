@@ -314,6 +314,9 @@ details.tbl th { font-weight: 600; color: var(--label-2); }
 .pos-right { display: grid; justify-items: end; font-size: 13px; color: var(--label-2); flex-shrink: 0; }
 .pos-right .money:first-child { font-size: 15px; color: var(--label); font-weight: 500; }
 #depot-refresh.spin svg { animation: spin .8s linear infinite; }
+.spans { margin: 4px 18px 6px; width: calc(100% - 36px); }
+.plan-head { display: flex; align-items: center; gap: 8px; padding: 14px 18px 4px; border-top: 0.5px solid var(--sep); margin-top: 6px; }
+.plan-head .grow { flex: 1; }
 .hint-txt { font-size: 13px; color: var(--label-2); padding: 0 4px; }
 .sym-res { display: grid; background: var(--group); border-radius: 12px; overflow: hidden; }
 .sym-res button { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 12px; text-align: left; width: 100%; }
@@ -728,7 +731,8 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     mailTab: "unread",
     tasks: null, tasksErr: null, tasksReadOnly: false, showDone: false, editing: null,
     view: "uebersicht",
-    fin: { tx: null, budgets: null, fixed: null, goals: null, depot: null }, finErr: null, finReadOnly: false,
+    fin: { tx: null, budgets: null, fixed: null, goals: null, depot: null, plans: null, exec: null }, finErr: null, finReadOnly: false,
+    hist: null, histErr: null, depotSpan: null,
     depotQuotes: undefined, depotErr: null,
     wx: undefined, wxErr: null,
     finMonth: { y: new Date().getFullYear(), m: new Date().getMonth() },
@@ -1514,7 +1518,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     try { uid = await user.id(); } catch (e) {}
     if (!uid) { state.finErr = "Melde dich in claude.ai an, um deine Finanzen zu sehen."; state.wx = null; maybeFetchWeather(); renderFinance(); return; }
     const base = db.doc(`data/users/${uid}/dashboard`);
-    finCols = { tx: base.collection("tx"), budgets: base.collection("budgets"), fixed: base.collection("fixed"), goals: base.collection("goals"), depot: base.collection("depot"), meta: base.collection("meta") };
+    finCols = { tx: base.collection("tx"), budgets: base.collection("budgets"), fixed: base.collection("fixed"), goals: base.collection("goals"), depot: base.collection("depot"), meta: base.collection("meta"), plans: base.collection("plans"), exec: base.collection("exec") };
     const docsOf = (snap) => snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
     const onErr = (e) => {
       state.finErr = e && e.code === "revoked" ? "Der Zugriff auf die Finanzen wurde beendet." : "Die Finanzdaten sind gerade nicht erreichbar. Lade die Seite neu.";
@@ -1525,6 +1529,14 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     finCols.fixed.onSnapshot((snap) => { state.fin.fixed = docsOf(snap); renderFinance(); }, onErr);
     finCols.goals.onSnapshot((snap) => { state.fin.goals = docsOf(snap); renderFinance(); }, onErr);
     finCols.depot.onSnapshot((snap) => { state.fin.depot = docsOf(snap); renderDepot(); maybeFetchQuotes(); }, onErr);
+    finCols.plans.onSnapshot((snap) => { state.fin.plans = docsOf(snap); renderDepot(); runPlans(); }, onErr);
+    finCols.exec.onSnapshot((snap) => { state.fin.exec = docsOf(snap); renderDepot(); runPlans(); }, onErr);
+    finCols.meta.onSnapshot((snap) => {
+      const h = {};
+      for (const d of snap.docs) if (d.id.startsWith("hist_")) h[d.id] = d.data();
+      state.hist = h;
+      renderDepot(); maybeFetchHist(); runPlans();
+    }, onErr);
     finCols.meta.doc("weather").onSnapshot((snap) => {
       if (snap.exists) state.wx = snap.data(); else if (state.wx === undefined) state.wx = null;
       renderWeather(); maybeFetchWeather();
@@ -1772,6 +1784,8 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     for (const b of document.querySelectorAll("[data-finadd]")) b.disabled = !finCols || state.finReadOnly;
     renderDepot();
     maybeFetchQuotes();
+    maybeFetchHist();
+    runPlans();
     if (!finLoaded()) {
       const sk = state.finErr ? "" : SKELETON;
       for (const id of ["#fin-budget", "#fin-trend", "#fin-tx", "#fin-fixed", "#fin-goals"]) $(id).innerHTML = sk;
@@ -2104,6 +2118,8 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     }
     depotFetching = false;
     renderDepot();
+    maybeFetchHist();
+    runPlans();
   }
 
   function maybeFetchQuotes() {
@@ -2146,20 +2162,338 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     });
   }
 
+  // Kursverlauf (tägliche Schlusskurse, 2 Jahre), einmal pro Tag je Wertpapier
+  const SPANS = [
+    { id: "1W", label: "1W", long: "1 Woche", days: 7 },
+    { id: "1M", label: "1M", long: "1 Monat", months: 1 },
+    { id: "6M", label: "6M", long: "6 Monate", months: 6 },
+    { id: "1J", label: "1J", long: "1 Jahr", months: 12 },
+    { id: "2J", label: "2J", long: "2 Jahre", months: 24 },
+  ];
+  try { const sp = localStorage.getItem("depotSpan"); if (SPANS.some((x) => x.id === sp)) state.depotSpan = sp; } catch (e) {}
+  if (!state.depotSpan) state.depotSpan = "1M";
+  const histId = (sym) => "hist_" + sym.replace(/[^A-Za-z0-9_.~:@+-]/g, "_");
+  const histTried = {};
+  let histFetching = false;
+
+  function fxSymbolsNeeded() {
+    const curs = new Set();
+    for (const x of Object.values((state.depotQuotes && state.depotQuotes.q) || {})) { const c = normCur(x.currency); if (c !== "EUR") curs.add(c); }
+    return [...curs].map((c) => `EUR${c}=X`);
+  }
+
+  async function fetchHist() {
+    if (histFetching || !mcp || !finCols || !state.hist) return;
+    const today = dayKey(new Date());
+    const need = depotSymbols().concat(fxSymbolsNeeded())
+      .filter((s) => { const h = state.hist[histId(s)]; return (!h || h.day !== today) && histTried[s] !== today; });
+    if (!need.length) return;
+    histFetching = true; renderDepot();
+    try {
+      for (let i = 0; i < need.length; i += 10) {
+        const chunk = need.slice(i, i + 10);
+        const arr = await firecrawl(chunk.map((s) => ({ provider: "finance-yahoo-com", capability: "equities/history", options: { symbol: s, interval: "1d", range: "2y" } })), false);
+        for (let j = 0; j < chunk.length; j++) {
+          const s = chunk[j];
+          histTried[s] = today;
+          const data = arr[j] && arr[j].data;
+          if (!data || !Array.isArray(data.bars)) continue;
+          const bars = data.bars.filter((b) => b && b.date && typeof b.close === "number");
+          const doc = { sym: s, day: today, cur: data.currency || "EUR", d: bars.map((b) => b.date), c: bars.map((b) => Math.round(b.close * 10000) / 10000) };
+          state.hist[histId(s)] = doc;
+          await finWrite(() => finCols.meta.doc(histId(s)).set(doc));
+        }
+      }
+      state.histErr = null;
+    } catch (e) {
+      for (const s of need) histTried[s] = today;
+      state.histErr = depotErrText(e);
+    }
+    histFetching = false;
+    renderDepot();
+    runPlans();
+    setTimeout(maybeFetchHist, 0);
+  }
+  function maybeFetchHist() {
+    if (state.view !== "finanzen" || !state.hist || !state.fin.depot || !depotSymbols().length) return;
+    fetchHist();
+  }
+
+  // Schlusskurs in Euro am Tag k oder dem letzten Handelstag davor
+  function closeSeries(sym) {
+    const h = state.hist && state.hist[histId(sym)];
+    if (!h || !h.d || !h.d.length) return null;
+    const cur = h.cur || "EUR";
+    let fxH = null;
+    if (normCur(cur) !== "EUR") { fxH = state.hist[histId(`EUR${normCur(cur)}=X`)]; if (!fxH) return null; }
+    const fxAt = (k) => { let r = null; for (let i = 0; i < fxH.d.length && fxH.d[i] <= k; i++) r = fxH.c[i]; return r || fxH.c[0]; };
+    const out = new Map();
+    h.d.forEach((k, i) => {
+      let v = h.c[i];
+      if (cur === "GBp" || cur === "GBX") v /= 100;
+      if (fxH) v /= fxAt(k);
+      out.set(k, v);
+    });
+    return out;
+  }
+  function liveEur(sym) {
+    const qd = state.depotQuotes || {};
+    const q = qd.q && qd.q[sym];
+    return q ? toEur(q.price, q.currency, qd.fx || {}) : null;
+  }
+
+  function spanStart(span) {
+    const t = startOfDay(new Date());
+    if (span.days) return addDays(t, -span.days);
+    const d = new Date(t); d.setMonth(d.getMonth() - span.months); return d;
+  }
+
+  function depotSeries() {
+    const pos = state.fin.depot || [];
+    if (!pos.length) return null;
+    const span = SPANS.find((x) => x.id === state.depotSpan) || SPANS[1];
+    const startK = dayKey(spanStart(span));
+    const todayK = dayKey(new Date());
+    const execs = state.fin.exec || [];
+    const lines = [];
+    for (const p of pos) {
+      const sym = String(p.symbol || "").toUpperCase();
+      const cs = closeSeries(sym);
+      if (!cs) return null;
+      lines.push({ p, sym, cs, keys: [...cs.keys()], ex: execs.filter((x) => x.posId === p.id) });
+    }
+    const dates = [...new Set(lines.flatMap((l) => l.keys))].filter((k) => k >= startK && k <= todayK).sort();
+    const live = lines.every((l) => liveEur(l.sym) != null);
+    if (live && dates[dates.length - 1] !== todayK && [1, 2, 3, 4, 5].includes(new Date().getDay())) dates.push(todayK);
+    const pts = [];
+    const ptr = lines.map(() => -1);
+    for (const k of dates) {
+      let v = 0, ok = true;
+      for (let li = 0; li < lines.length; li++) {
+        const l = lines[li];
+        while (ptr[li] + 1 < l.keys.length && l.keys[ptr[li] + 1] <= k) ptr[li]++;
+        let c = ptr[li] >= 0 ? l.cs.get(l.keys[ptr[li]]) : null;
+        if (k === todayK && live) c = liveEur(l.sym);
+        if (c == null) { ok = false; break; }
+        const later = l.ex.filter((x) => x.date > k).reduce((a, x) => a + (x.qty || 0), 0);
+        v += Math.max(0, (l.p.qty || 0) - later) * c;
+      }
+      if (ok) pts.push({ k, v: Math.round(v * 100) });
+    }
+    return pts.length >= 2 ? { pts, span } : null;
+  }
+
+  let chartPts = [];
+  function chartHTML(series) {
+    const box = $("#fin-depot");
+    const pts = series.pts;
+    chartPts = pts;
+    const W = Math.max(280, Math.round((box && box.clientWidth) - 36) || 520), H = 210;
+    const L = 64, R = 8, T = 12, B = 26;
+    const pw = W - L - R, ph = H - T - B;
+    let min = Math.min(...pts.map((p) => p.v)), max = Math.max(...pts.map((p) => p.v));
+    if (max === min) { max += 100; min -= 100; }
+    const step = niceStep(max - min);
+    const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+    const x = (i) => L + (pts.length === 1 ? pw / 2 : (i / (pts.length - 1)) * pw);
+    const y = (v) => T + ph - ((v - lo) / (hi - lo)) * ph;
+    const up = pts[pts.length - 1].v >= pts[0].v;
+    const col = up ? "var(--green)" : "var(--red)";
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Depotwert im Zeitraum ${esc(series.span.long)}">
+      <defs><linearGradient id="dgrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>`;
+    for (let v = lo; v <= hi + 1e-6; v += step) {
+      const yy = y(v).toFixed(1);
+      svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}"/><text class="axis" x="${L - 8}" y="${yy}" dy="0.35em" text-anchor="end">${esc(eur0(v))}</text>`;
+    }
+    const short = series.span.days || series.span.months <= 1;
+    const nLab = Math.min(W < 420 ? 3 : 5, pts.length);
+    for (let j = 0; j < nLab; j++) {
+      const i = Math.round((j / Math.max(1, nLab - 1)) * (pts.length - 1));
+      const d = new Date(pts[i].k + "T00:00:00");
+      const lab = short ? d.toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : d.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
+      const anchor = j === 0 ? "start" : j === nLab - 1 ? "end" : "middle";
+      svg += `<text class="axis" x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="${anchor}">${esc(lab)}</text>`;
+    }
+    svg += `<line class="base" x1="${L}" x2="${W - R}" y1="${(T + ph).toFixed(1)}" y2="${(T + ph).toFixed(1)}"/>`;
+    svg += `<line x1="${L}" x2="${W - R}" y1="${y(pts[0].v).toFixed(1)}" y2="${y(pts[0].v).toFixed(1)}" stroke="var(--label-3)" stroke-width="1" stroke-dasharray="2 4"/>`;
+    const line = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
+    svg += `<path d="${line}L${x(pts.length - 1).toFixed(1)},${(T + ph).toFixed(1)}L${x(0).toFixed(1)},${(T + ph).toFixed(1)}Z" fill="url(#dgrad)"/>`;
+    svg += `<path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    svg += `<circle cx="${x(pts.length - 1).toFixed(1)}" cy="${y(pts[pts.length - 1].v).toFixed(1)}" r="4" fill="${col}" stroke="var(--card)" stroke-width="2"/>`;
+    svg += `<g id="dcross" visibility="hidden"><line id="dcl" y1="${T}" y2="${T + ph}" stroke="var(--label-3)" stroke-width="1"/><circle id="dcc" r="5" fill="${col}" stroke="var(--card)" stroke-width="2"/></g>`;
+    svg += `<rect class="dhit" x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent" data-l="${L}" data-pw="${pw}" data-t="${T}" data-ph="${ph}" data-lo="${lo}" data-hi="${hi}"/>`;
+    svg += "</svg>";
+    return svg;
+  }
+  function depotTip(e) {
+    const hit = e.target && e.target.closest ? e.target.closest(".dhit") : null;
+    const tip = $("#dtip"), cross = $("#dcross");
+    if (!hit || !chartPts.length || !tip) { if (tip) tip.hidden = true; if (cross) cross.setAttribute("visibility", "hidden"); return; }
+    const svg = hit.ownerSVGElement;
+    const r = svg.getBoundingClientRect();
+    const scale = svg.viewBox.baseVal.width / r.width;
+    const L = +hit.dataset.l, pw = +hit.dataset.pw, T = +hit.dataset.t, ph = +hit.dataset.ph, lo = +hit.dataset.lo, hi = +hit.dataset.hi;
+    const px = (e.clientX - r.left) * scale;
+    const i = Math.max(0, Math.min(chartPts.length - 1, Math.round(((px - L) / pw) * (chartPts.length - 1))));
+    const p = chartPts[i];
+    const cx = L + (chartPts.length === 1 ? pw / 2 : (i / (chartPts.length - 1)) * pw);
+    const cy = T + ph - ((p.v - lo) / (hi - lo)) * ph;
+    $("#dcl").setAttribute("x1", cx); $("#dcl").setAttribute("x2", cx);
+    $("#dcc").setAttribute("cx", cx); $("#dcc").setAttribute("cy", cy);
+    cross.setAttribute("visibility", "visible");
+    const diff = p.v - chartPts[0].v;
+    tip.innerHTML = `<b>${esc(new Date(p.k + "T00:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short", year: "numeric" }))}</b>
+      <div class="tr"><span>Depotwert</span><span class="money">${esc(eur(p.v))}</span></div>
+      <div class="tr"><span>Seit Zeitraumbeginn</span><span class="money">${esc(signed(diff))}</span></div>`;
+    tip.hidden = false;
+    const box = $("#dchart").getBoundingClientRect();
+    let left = cx / scale + (r.left - box.left) - tip.offsetWidth / 2;
+    left = Math.max(8, Math.min(left, box.width - tip.offsetWidth - 8));
+    tip.style.left = left + "px";
+    tip.style.top = "0px";
+  }
+  $("#fin-depot").addEventListener("pointermove", depotTip);
+  $("#fin-depot").addEventListener("pointerleave", () => depotTip({ target: null }));
+  if (window.ResizeObserver) {
+    let lw = 0;
+    new ResizeObserver((en) => { const w = Math.round(en[0].contentRect.width); if (w && w !== lw) { lw = w; if (state.view === "finanzen") renderDepot(); } }).observe($("#fin-depot"));
+  }
+
+  // ---------- Sparplan ----------
+  const tabId = Math.random().toString(36).slice(2);
+  let planRunning = false;
+  function execDateIn(ym, day) {
+    const d = new Date(ym.y, ym.m, Math.min(day, daysIn(ym.y, ym.m)));
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    return d;
+  }
+  function nextExec(plan) {
+    const today = startOfDay(new Date());
+    for (let i = 0; i < 3; i++) {
+      const d = execDateIn(shiftMonth(nowYM(), i), plan.day || 1);
+      if (d >= today && (!plan.start || dayKey(d) >= plan.start)) return d;
+    }
+    return null;
+  }
+  function priceOn(sym, k) {
+    const cs = closeSeries(sym);
+    if (cs) for (const kk of cs.keys()) if (kk >= k) return { date: kk, price: cs.get(kk) };
+    const q = state.depotQuotes && state.depotQuotes.q && state.depotQuotes.q[sym];
+    const live = liveEur(sym);
+    if (q && live && q.time && dayKey(new Date(q.time)) >= k) return { date: dayKey(new Date(q.time)), price: live };
+    return null;
+  }
+  async function runPlans() {
+    if (planRunning || !finCols || state.finReadOnly) return;
+    const plans = state.fin.plans, execs = state.fin.exec, depot = state.fin.depot;
+    if (!plans || !execs || !depot || !state.hist) return;
+    const today = startOfDay(new Date());
+    const done = new Set(execs.map((x) => x.id));
+    const todo = [];
+    for (const plan of plans) {
+      if (plan.active === false || !plan.start || !plan.amount) continue;
+      if (!depot.some((p) => p.id === plan.posId)) continue;
+      let ym = { y: +plan.start.slice(0, 4), m: +plan.start.slice(5, 7) - 1 };
+      for (let guard = 0; guard < 36 && (ym.y < nowYM().y || (ym.y === nowYM().y && ym.m <= nowYM().m)); guard++) {
+        const d = execDateIn(ym, plan.day || 1);
+        const id = `${plan.id}_${monthKey(ym)}`;
+        if (dayKey(d) >= plan.start && d <= today && !done.has(id)) todo.push({ plan, d, id });
+        ym = shiftMonth(ym, 1);
+      }
+    }
+    if (!todo.length) return;
+    planRunning = true;
+    const local = {};
+    for (const t of todo) {
+      const base = local[t.plan.posId] || depot.find((p) => p.id === t.plan.posId);
+      const sym = String(base.symbol || "").toUpperCase();
+      const px = priceOn(sym, dayKey(t.d));
+      if (!px || !(px.price > 0)) continue;
+      const ref = finCols.exec.doc(t.id);
+      try {
+        const lease = await ref.acquire({ holder: tabId, ttlMs: 15000 });
+        if (!lease.acquired) continue;
+        const snap = await ref.get();
+        if (snap.exists && snap.data() && snap.data().date) continue;
+        const qty = Math.round((t.plan.amount / 100 / px.price) * 1e6) / 1e6;
+        await ref.set({ planId: t.plan.id, posId: base.id, date: px.date, amount: t.plan.amount, price: Math.round(px.price * 10000) / 10000, qty, createdAt: Date.now() });
+        const cost = base.invested || Math.round((base.qty || 0) * (base.buyPrice || 0));
+        const newQty = Math.round(((base.qty || 0) + qty) * 1e6) / 1e6;
+        const inv = cost + t.plan.amount;
+        await finCols.depot.doc(base.id).update({ qty: newQty, invested: inv, buyPrice: Math.round(inv / newQty) });
+        local[base.id] = Object.assign({}, base, { qty: newQty, invested: inv });
+        showToast(`Sparplan ausgeführt: ${eur(t.plan.amount)} in ${base.name || sym}`);
+      } catch (e) {
+        break;
+      }
+    }
+    planRunning = false;
+  }
+
+  function planSection(rows) {
+    const plans = (state.fin.plans || []).filter((p) => p.active !== false);
+    const total = plans.reduce((a, p) => a + (p.amount || 0), 0);
+    let html = `<div class="plan-head"><span class="card-title" style="font-size:17px">Sparplan</span><span class="card-meta">${plans.length ? `${esc(eur(total))} pro Monat` : ""}</span><span class="grow"></span><button type="button" class="mini" data-planadd="1"${!rows.length || state.finReadOnly ? " disabled" : ""}>+ Sparplan</button></div>`;
+    if (!plans.length) {
+      return html + `<div class="hint-txt" style="padding:0 18px 14px">${rows.length ? "Lege fest, wie viel du jeden Monat automatisch in eine Position investierst. Die Seite bucht die Ausführung dann selbst ein." : "Füge zuerst eine Position hinzu."}</div>`;
+    }
+    const execs = state.fin.exec || [];
+    html += '<ul class="list">' + plans.map((pl) => {
+      const r = rows.find((x) => x.p.id === pl.posId);
+      const nx = nextExec(pl);
+      const last = execs.filter((x) => x.planId === pl.id).sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+      const sub = [`am ${pl.day}.`, nx ? `nächste ${nx.toLocaleDateString("de-DE", { day: "numeric", month: "short" })}` : ""]
+        .concat(last ? [`zuletzt ${dateShort(last.date)}: ${qtyTxt(last.qty)} Stk zu ${eur(Math.round(last.price * 100))}`] : []).filter(Boolean).join(" · ");
+      return `<li><button type="button" class="row pos hoverable" data-planid="${esc(pl.id)}" style="--cat:${r ? r.color : "var(--c-other)"}">
+        <span class="cat-dot"></span>
+        <span class="row-main"><span class="row-title" style="display:block">${esc(r ? r.name : "Position gelöscht")}</span><span class="row-sub" style="display:block">${esc(sub)}</span></span>
+        <span class="pos-right"><span class="money">${esc(eur(pl.amount))}</span><span>monatlich</span></span>
+      </button></li>`;
+    }).join("") + "</ul>";
+    return html;
+  }
+
+  function openPlanSheet(pl) {
+    const rows = positionRows();
+    if (!rows.length) return;
+    const firstDefault = (() => { const d = nextExec({ day: pl ? pl.day : 16 }); return d ? dayKey(d) : dayKey(new Date()); })();
+    openSheet({
+      title: pl ? "Sparplan bearbeiten" : "Neuer Sparplan",
+      submit: pl ? "Sichern" : "Hinzufügen",
+      done: pl ? "Sparplan gesichert" : "Sparplan angelegt",
+      fields: [
+        { id: "posId", type: "select", label: "Position", value: pl ? pl.posId : rows[0].p.id, options: rows.map((r) => ({ value: r.p.id, label: r.name })) },
+        { id: "amount", type: "amount", label: "Betrag pro Monat", value: pl ? toInput(pl.amount) : "" },
+        { id: "day", type: "select", label: "Ausführung am", value: String(pl ? pl.day : 16), options: Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}. des Monats` })) },
+        { id: "start", type: "date", label: "Erste Ausführung", value: pl ? pl.start : firstDefault },
+      ],
+      after: '<div class="hint-txt">Fällt der Tag auf ein Wochenende, zählt der nächste Handelstag. Gekauft wird rechnerisch zum Schlusskurs dieses Tages. Eine Betragsänderung gilt ab der nächsten Ausführung.</div>',
+      check(v) {
+        const amount = needAmount(v.amount);
+        if (!amount) return "Gib einen Betrag pro Monat ein, zum Beispiel 50.";
+        if (!v.start) return "Wähle das Datum der ersten Ausführung.";
+        return { posId: v.posId, amount, day: Number(v.day) || 16, start: v.start, active: true };
+      },
+      save: (d) => (pl ? finCols.plans.doc(pl.id).update(d) : finCols.plans.add(Object.assign(d, { createdAt: Date.now() }))),
+      onDelete: pl ? () => finCols.plans.doc(pl.id).delete() : null,
+      deleteLabel: "Sparplan beenden",
+    });
+  }
+
   function renderDepot() {
     const box = $("#fin-depot");
     if (!box || state.view !== "finanzen") return;
     const qd = state.depotQuotes || {};
-    $("#depot-refresh").disabled = depotFetching || !finCols || !depotSymbols().length;
-    $("#depot-refresh").classList.toggle("spin", depotFetching);
+    const busy = depotFetching || histFetching;
+    $("#depot-refresh").disabled = busy || !finCols || !depotSymbols().length;
+    $("#depot-refresh").classList.toggle("spin", busy);
     if (!state.fin.depot) { box.innerHTML = state.finErr ? "" : SKELETON; return; }
     const rows = positionRows();
     const nSym = depotSymbols().length;
     const fresh = qd.at ? `Kurse von ${fmtTime(new Date(qd.at))} Uhr` : "Noch keine Kurse";
     $("#fin-depot-meta").textContent = rows.length ? `${rows.length} ${rows.length === 1 ? "Position" : "Positionen"} · ${depotFetching ? "Kurse werden geladen …" : fresh}` : "Aktien und ETFs";
-    const notice = state.depotErr
-      ? `<div class="notice" role="status"><span>${esc(state.depotErr)}</span><button type="button" data-depotrefresh="1">Kurse abrufen</button></div>`
-      : "";
+    const err = state.depotErr || state.histErr;
+    const notice = err ? `<div class="notice" role="status"><span>${esc(err)}</span><button type="button" data-depotrefresh="1">Kurse abrufen</button></div>` : "";
     if (!rows.length) {
       box.innerHTML = notice + '<div class="empty"><strong>Noch keine Positionen</strong>Füge mit „+“ deine Aktien und ETFs hinzu. Die Kurse kommen dann live über Firecrawl.</div>';
       return;
@@ -2168,25 +2502,38 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     const value = rows.reduce((a, r) => a + (r.value != null ? r.value : r.cost), 0);
     const costPriced = priced.reduce((a, r) => a + r.cost, 0);
     const pl = priced.reduce((a, r) => a + (r.value - r.cost), 0);
-    const day = priced.reduce((a, r) => a + r.day, 0);
-    const dayBase = priced.reduce((a, r) => a + (r.value - r.day), 0);
     const cls = (x) => (x > 0 ? "pl-up" : x < 0 ? "pl-down" : "");
+    const series = depotSeries();
+    const span = SPANS.find((x) => x.id === state.depotSpan) || SPANS[1];
+    let periodLine = "";
+    if (series) {
+      const a = series.pts[0].v, b = series.pts[series.pts.length - 1].v;
+      periodLine = `<span class="money ${cls(b - a)}">${esc(signed(b - a))} (${esc(pctTxt(a ? (b - a) / a : 0))})</span><span>${esc(span.long)}</span>`;
+    }
     let html = notice + `<div class="depot-sum">
       <div class="widget-big money">${esc(eur(value))}</div>
-      ${priced.length ? `<div class="depot-pl"><span class="money ${cls(pl)}">${esc(signed(pl))} (${esc(pctTxt(costPriced ? pl / costPriced : 0))})</span><span>seit Kauf</span>
-        <span class="money ${cls(day)}">${esc(signed(day))} (${esc(pctTxt(dayBase ? day / dayBase : 0))})</span><span>heute</span></div>`
+      ${priced.length ? `<div class="depot-pl">${periodLine}<span class="money ${cls(pl)}">${esc(signed(pl))} (${esc(pctTxt(costPriced ? pl / costPriced : 0))})</span><span>seit Kauf</span></div>`
         : `<div class="widget-sub">${depotFetching ? "Kurse werden geladen …" : "Wert zum Kaufkurs, bis die Kurse geladen sind"}</div>`}
     </div>`;
+    html += `<div class="seg seg-full spans" role="tablist" aria-label="Zeitraum">${SPANS.map((x) =>
+      `<button type="button" role="tab" data-span="${x.id}" aria-selected="${x.id === state.depotSpan}">${x.label}</button>`).join("")}</div>`;
+    html += `<div class="chart" id="dchart">${series ? chartHTML(series) : `<div class="empty">${histFetching ? "Kursverlauf wird geladen …" : "Für das Diagramm fehlt noch der Kursverlauf. Er wird beim nächsten Abruf geladen."}</div>`}<div class="tip" id="dtip" hidden></div></div>`;
+    if (series) {
+      const pts = series.pts;
+      const sample = [...new Set(Array.from({ length: Math.min(8, pts.length) }, (_, j) => Math.round((j / Math.max(1, Math.min(8, pts.length) - 1)) * (pts.length - 1))))];
+      html += `<details class="tbl"><summary>Als Tabelle anzeigen</summary><div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Depotwert</th></tr></thead><tbody>${sample.map((i) =>
+        `<tr><td>${esc(dateShort(pts[i].k))} ${pts[i].k.slice(0, 4)}</td><td>${esc(eur(pts[i].v))}</td></tr>`).join("")}</tbody></table></div></details>`;
+    }
     const shares = rows.map((r) => ({ r, v: r.value != null ? r.value : r.cost })).filter((x) => x.v > 0);
     const folded = shares.filter((x) => x.r.color === "var(--c-other)").reduce((a, x) => a + x.v, 0);
     const named = shares.filter((x) => x.r.color !== "var(--c-other)");
     if (value > 0) {
-      html += `<div class="stackbar" role="img" aria-label="Aufteilung des Depots">${named.map((x) =>
+      html += `<div class="stackbar" style="margin-top:6px" role="img" aria-label="Aufteilung des Depots">${named.map((x) =>
         `<span style="--cat:${x.r.color};flex:${x.v} 1 0" title="${esc(x.r.name)}: ${esc(eur(x.v))} (${Math.round((x.v / value) * 100)} %)"></span>`).join("")}${folded ? `<span style="--cat:var(--c-other);flex:${folded} 1 0" title="Weitere: ${esc(eur(folded))}"></span>` : ""}</div>`;
     }
     html += '<ul class="list">' + rows.map((r) => {
       const share = value ? Math.round(((r.value != null ? r.value : r.cost) / value) * 100) : 0;
-      const priceTxt = r.q ? `${fmtNative(r.q.price, r.q.currency)}` : ((qd.missing || []).includes(r.sym) ? "Kurs nicht gefunden" : "Kurs fehlt");
+      const priceTxt = r.q ? fmtNative(r.q.price, r.q.currency) : ((qd.missing || []).includes(r.sym) ? "Kurs nicht gefunden" : "Kurs fehlt");
       const right = r.value != null
         ? `<span class="money">${esc(eur(r.value))}</span><span class="money ${cls(r.value - r.cost)}">${esc(pctTxt(r.cost ? (r.value - r.cost) / r.cost : 0))}</span>`
         : `<span class="money">${esc(eur(r.cost))}</span><span>Kaufwert</span>`;
@@ -2197,8 +2544,9 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
         <span class="pos-right">${right}</span>
       </button></li>`;
     }).join("") + "</ul>";
+    html += planSection(rows);
     const delayed = Object.values(qd.q || {}).some((x) => x.delayed);
-    html += `<div class="card-foot"><span>Yahoo Finance über Firecrawl${delayed ? ", teils 15 Min. verzögert" : ""} · je Abruf ca. ${nSym * 5} Credits</span></div>`;
+    html += `<div class="card-foot"><span>Yahoo Finance über Firecrawl${delayed ? ", teils 15 Min. verzögert" : ""} · Kurse ca. ${nSym * 5} Credits je Abruf, Verlauf ca. ${nSym * 5} Credits pro Tag</span></div>`;
     box.innerHTML = html;
   }
 
@@ -2220,13 +2568,23 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
         { id: "qty", type: "text", label: "Stückzahl", placeholder: "z. B. 10", value: p ? String(p.qty).replace(".", ",") : "", inputmode: "decimal" },
         { id: "invested", type: "amount", label: "Eingezahlt gesamt", value: p && p.invested ? toInput(p.invested) : "" },
         { id: "buy", type: "amount", label: "oder Kaufkurs je Stück", value: p && !p.invested ? toInput(p.buyPrice) : "" },
+        { id: "pct", type: "text", label: "oder Plus seit Kauf (%)", placeholder: "z. B. 19,55", value: "", inputmode: "decimal" },
       ],
-      after: '<div class="hint-txt">Tipp: Für Kurse direkt in Euro die Xetra-Notierung nehmen, also Symbole mit der Endung .DE (z. B. SAP.DE). Die Suche kostet ca. 5 Firecrawl-Credits.</div><div id="sym-results"></div>',
+      after: '<div class="hint-txt">Von „Eingezahlt gesamt“, „Kaufkurs je Stück“ und „Plus seit Kauf“ reicht eine Angabe. Das Plus rechnet die Seite mit dem aktuellen Kurs in den Einstandswert um. Für Kurse direkt in Euro die Xetra-Notierung nehmen, also Symbole mit der Endung .DE (z. B. SAP.DE). Die Suche kostet ca. 5 Firecrawl-Credits.</div><div id="sym-results"></div>',
       check(v) {
         const symbol = v.symbol.trim().toUpperCase();
         if (!SYMBOL_RE.test(symbol)) return "Gib ein gültiges Symbol ein, zum Beispiel SAP.DE, oder nutze die Suche.";
         const qty = parseQty(v.qty);
         if (!qty) return "Gib eine Stückzahl größer als 0 ein, zum Beispiel 10 oder 2,5.";
+        const pctRaw = v.pct.trim().replace("%", "").replace(/\s/g, "").replace(",", ".").replace(/^\+/, "").replace("−", "-");
+        if (pctRaw) {
+          const pct = Number(pctRaw);
+          if (!Number.isFinite(pct) || pct <= -100) return "Gib das Plus oder Minus seit Kauf als Zahl ein, zum Beispiel 19,55 oder -3,2.";
+          const live = liveEur(symbol);
+          if (live == null) return "Für diese Umrechnung braucht die Seite einen aktuellen Kurs. Speichere die Position zuerst mit dem eingezahlten Betrag, warte auf die Kurse und trag dann das Plus ein.";
+          const inv = Math.round((qty * live * 100) / (1 + pct / 100));
+          return { symbol, name: v.name.trim(), qty, invested: inv, buyPrice: Math.round(inv / qty) };
+        }
         const invested = needAmount(v.invested);
         if (invested) return { symbol, name: v.name.trim(), qty, invested, buyPrice: Math.round(invested / qty) };
         const buyPrice = needAmount(v.buy);
@@ -2410,13 +2768,21 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       else if (d.finadd === "pos") openPosSheet(null);
     } else if (d.depotrefresh) {
       state.depotErr = null;
+      if (state.histErr) { state.histErr = null; for (const k of Object.keys(histTried)) delete histTried[k]; }
       fetchQuotes(true);
+      maybeFetchHist();
+    } else if (d.span) {
+      state.depotSpan = d.span;
+      try { localStorage.setItem("depotSpan", d.span); } catch (err) {}
+      renderDepot();
     } else if (state.finReadOnly) {
       return;
     } else if (d.txid) { const t = byId("tx", d.txid); if (t) openTxSheet(t); }
     else if (d.fixedid) { const f = byId("fixed", d.fixedid); if (f) openFixedSheet(f); }
     else if (d.goalid) { const g = byId("goals", d.goalid); if (g) openGoalSheet(g); }
     else if (d.posid) { const p = byId("depot", d.posid); if (p) openPosSheet(p); }
+    else if (d.planadd && finCols) openPlanSheet(null);
+    else if (d.planid) { const pl = byId("plans", d.planid); if (pl) openPlanSheet(pl); }
     else if (d.deposit) { const g = byId("goals", d.deposit); if (g) openDepositSheet(g); }
     else if (d.budget && finCols) openBudgetSheet(d.budget);
     else if (d.book) {
