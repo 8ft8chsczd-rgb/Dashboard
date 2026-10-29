@@ -291,6 +291,34 @@ details.tbl th { font-weight: 600; color: var(--label-2); }
 }
 .danger { color: var(--red); font-weight: 500; justify-self: center; font-size: 15px; padding: 4px 10px; }
 
+/* Antippbare Widgets und Aufgaben-Detailansicht */
+.widget.tap { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.widget.tap:hover { box-shadow: var(--shadow), 0 0 0 1px var(--sep); }
+.widget.tap:active { transform: scale(.985); }
+.widget-head .chev { width: 14px; height: 14px; margin-left: auto; color: var(--label-3); }
+dialog.sheet-dlg.wide { width: min(600px, calc(100vw - 32px)); }
+.sheet-head .link-btn.done-btn { justify-self: end; font-weight: 600; font-size: 16px; }
+.td-group { display: grid; gap: 6px; }
+.td-label { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--label-2); padding: 0 4px; display: flex; gap: 6px; }
+.td-label.over { color: var(--red); }
+.td-label.today { color: var(--orange); }
+.td-label .count { color: var(--label-3); font-weight: 500; }
+.td-list { list-style: none; margin: 0; padding: 0; background: var(--group); border-radius: 12px; overflow: hidden; }
+.td-item { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 11px 12px; }
+.td-item + .td-item::before { content: ""; position: absolute; top: 0; right: 0; left: 46px; border-top: 0.5px solid var(--sep); }
+.td-item .check { margin-top: 1px; }
+.td-main { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.td-title { overflow-wrap: anywhere; }
+.td-notes { font-size: 14px; color: var(--label-2); white-space: pre-line; overflow-wrap: anywhere; }
+.td-meta { font-size: 12.5px; color: var(--label-3); }
+.td-item.done .td-title { color: var(--label-2); text-decoration: line-through; text-decoration-color: var(--label-3); }
+.td-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.td-actions button { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--label-3); }
+.td-actions button:hover { background: var(--fill-2); color: var(--blue); }
+.td-actions button.danger-ic:hover { color: var(--red); }
+.td-actions svg { width: 15px; height: 15px; }
+#task-detail { display: grid; gap: 18px; }
+
 /* Wetter */
 .widget-head svg { flex-shrink: 0; }
 .wx-now { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -495,7 +523,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
   <section class="glance" aria-label="Auf einen Blick">
     <div class="widget" id="w-next"></div>
     <div class="widget" id="w-mail"></div>
-    <div class="widget" id="w-tasks"></div>
+    <div class="widget tap" id="w-tasks" role="button" tabindex="0" aria-haspopup="dialog" aria-label="Alle Aufgaben anzeigen"></div>
     <div class="widget" id="w-weather"></div>
   </section>
 
@@ -710,6 +738,21 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     <div class="ev-msg" id="fin-msg" role="alert" hidden></div>
     <button type="button" class="danger" id="fin-del" hidden>Löschen</button>
   </form>
+</dialog>
+<dialog class="sheet-dlg wide" id="task-dialog" aria-labelledby="task-dialog-title">
+  <div class="sheet">
+    <div class="sheet-head">
+      <span></span>
+      <h2 id="task-dialog-title">Aufgaben</h2>
+      <button type="button" class="link-btn done-btn" id="task-dialog-close">Fertig</button>
+    </div>
+    <div class="seg seg-full" role="tablist" aria-label="Aufgaben filtern">
+      <button type="button" role="tab" data-tfilter="open" aria-selected="true">Offen</button>
+      <button type="button" role="tab" data-tfilter="done" aria-selected="false">Erledigt</button>
+      <button type="button" role="tab" data-tfilter="all" aria-selected="false">Alle</button>
+    </div>
+    <div id="task-detail"></div>
+  </div>
 </dialog>
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -1270,7 +1313,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
 
   function renderTaskWidget() {
     const el = $("#w-tasks");
-    const head = '<div class="widget-head"><span class="dot" style="background:var(--orange)"></span>Aufgaben</div>';
+    const head = '<div class="widget-head"><span class="dot" style="background:var(--orange)"></span>Aufgaben<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></div>';
     if (!state.tasks) {
       el.innerHTML = head + `<div class="widget-sub">${esc(state.tasksErr ? "Nicht verfügbar" : "Lädt …")}</div>`;
       return;
@@ -1284,7 +1327,108 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     if (today) bits.push(`<span class="chip" style="--chip:var(--orange)">${today} heute</span>`);
     el.innerHTML = head + `<div class="widget-big">${open.length}</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="widget-sub">${open.length === 1 ? "offene Aufgabe" : "offene Aufgaben"}</span>${bits.join("")}</div>`;
+    renderTaskDetail();
   }
+
+  // ---------- Aufgaben: Detailansicht ----------
+  const taskDlg = $("#task-dialog");
+  state.taskFilter = "open";
+  const ICON_PEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>';
+  const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+
+  function detailItem(t, now) {
+    const made = t.createdAt > 1e12 ? new Date(t.createdAt).toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" }) : "";
+    const doneAt = t.done && t.doneAt > 1e12 ? new Date(t.doneAt).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : "";
+    const meta = [made ? `Erstellt ${made}` : "", doneAt ? `erledigt ${doneAt}` : ""].filter(Boolean).join(" · ");
+    const ro = state.tasksReadOnly;
+    return `<li class="td-item${t.done ? " done" : ""}">
+      <button type="button" class="check" role="checkbox" aria-checked="${t.done ? "true" : "false"}" data-dtoggle="${esc(t.id)}" aria-label="${t.done ? "Als offen markieren" : "Als erledigt markieren"}"${ro ? " disabled" : ""}>${ICON_CHECK}</button>
+      <div class="td-main">
+        <span class="td-title">${esc(t.title)}</span>
+        ${t.notes ? `<span class="td-notes">${esc(t.notes)}</span>` : ""}
+        ${dueHTML(t, now)}
+        ${meta ? `<span class="td-meta">${esc(meta)}</span>` : ""}
+      </div>
+      ${ro ? "" : `<span class="td-actions">
+        <button type="button" data-dedit="${esc(t.id)}" aria-label="Bearbeiten: ${esc(t.title)}" title="Bearbeiten">${ICON_PEN}</button>
+        <button type="button" class="danger-ic" data-ddel="${esc(t.id)}" aria-label="Löschen: ${esc(t.title)}" title="Löschen">${ICON_TRASH}</button>
+      </span>`}
+    </li>`;
+  }
+  function detailGroup(label, items, now, cls) {
+    if (!items.length) return "";
+    return `<section class="td-group"><div class="td-label${cls ? " " + cls : ""}">${esc(label)}<span class="count">${items.length}</span></div>
+      <ul class="td-list">${items.map((t) => detailItem(t, now)).join("")}</ul></section>`;
+  }
+  function renderTaskDetail() {
+    if (!taskDlg.open) return;
+    for (const b of taskDlg.querySelectorAll("[data-tfilter]")) b.setAttribute("aria-selected", String(b.dataset.tfilter === state.taskFilter));
+    const box = $("#task-detail");
+    if (!state.tasks) { box.innerHTML = state.tasksErr ? `<div class="hint-txt">${esc(state.tasksErr)}</div>` : SKELETON; return; }
+    const now = new Date();
+    const { open, done } = sortedTasks();
+    const counts = { open: open.length, done: done.length, all: open.length + done.length };
+    for (const b of taskDlg.querySelectorAll("[data-tfilter]")) {
+      const base = { open: "Offen", done: "Erledigt", all: "Alle" }[b.dataset.tfilter];
+      b.textContent = `${base} (${counts[b.dataset.tfilter]})`;
+    }
+    let html = "";
+    if (state.taskFilter !== "done") {
+      const dd = (t) => (t.due ? dayDiff(parseDue(t.due), now) : null);
+      html += detailGroup("Überfällig", open.filter((t) => dd(t) != null && dd(t) < 0), now, "over");
+      html += detailGroup("Heute", open.filter((t) => dd(t) === 0), now, "today");
+      html += detailGroup("Morgen", open.filter((t) => dd(t) === 1), now);
+      html += detailGroup("Später", open.filter((t) => dd(t) != null && dd(t) > 1), now);
+      html += detailGroup("Ohne Datum", open.filter((t) => dd(t) == null), now);
+    }
+    if (state.taskFilter !== "open") html += detailGroup("Erledigt", done, now);
+    if (!html) {
+      html = state.taskFilter === "done"
+        ? '<div class="empty"><strong>Nichts erledigt</strong>Abgehakte Aufgaben erscheinen hier.</div>'
+        : '<div class="empty"><strong>Keine offenen Aufgaben</strong>Neue Aufgaben trägst du in der Karte „Aufgaben“ ein.</div>';
+    }
+    box.innerHTML = html;
+  }
+  function openTaskDetail() {
+    if (typeof taskDlg.showModal === "function") { if (!taskDlg.open) taskDlg.showModal(); } else taskDlg.setAttribute("open", "");
+    renderTaskDetail();
+    $("#task-dialog-close").focus();
+  }
+  function closeTaskDetail() {
+    if (typeof taskDlg.close === "function") taskDlg.close(); else taskDlg.removeAttribute("open");
+  }
+  $("#w-tasks").addEventListener("click", openTaskDetail);
+  $("#w-tasks").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openTaskDetail(); } });
+  $("#task-dialog-close").addEventListener("click", closeTaskDetail);
+  taskDlg.addEventListener("click", (e) => {
+    if (e.target === taskDlg) { closeTaskDetail(); return; }
+    const b = e.target.closest("button");
+    if (!b) return;
+    const d = b.dataset;
+    if (d.tfilter) { state.taskFilter = d.tfilter; renderTaskDetail(); return; }
+    if (!tasksCol || state.tasksReadOnly) return;
+    if (d.dtoggle) {
+      const t = (state.tasks || []).find((x) => x.id === d.dtoggle);
+      if (t) writeTask(() => tasksCol.doc(t.id).update({ done: !t.done, doneAt: t.done ? null : Date.now() }));
+    } else if (d.ddel) {
+      if (!b.dataset.armed) {
+        b.dataset.armed = "1"; b.style.color = "var(--red)"; b.title = "Nochmal tippen zum Löschen";
+        b.setAttribute("aria-label", "Nochmal tippen zum Löschen");
+        setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.style.color = ""; b.title = "Löschen"; } }, 3000);
+        return;
+      }
+      writeTask(() => tasksCol.doc(d.ddel).delete());
+    } else if (d.dedit) {
+      const t = (state.tasks || []).find((x) => x.id === d.dedit);
+      closeTaskDetail();
+      if (!t) return;
+      if (t.done) state.showDone = true;
+      state.editing = t.id;
+      renderTasks();
+      const inp = $("#edit-title");
+      if (inp) { inp.scrollIntoView({ block: "center", behavior: "smooth" }); inp.focus({ preventScroll: true }); }
+    }
+  });
 
   async function writeTask(fn) {
     try { await fn(); }
