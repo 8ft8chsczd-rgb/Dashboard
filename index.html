@@ -25,7 +25,7 @@
   --group: #ffffff;
   /* Kategorienfarben (geprüfte Reihenfolge, nie zyklisch) */
   --sun: #ffb800; --cloud: #b9bac2; --moon: #8e8e93;
-  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4; --c6: #008300; --c7: #6250d6; --c-other: #aeaeb2;
+  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4; --c6: #008300; --c7: #6250d6; --c8: #e34948; --c-other: #aeaeb2;
 
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -40,7 +40,7 @@
     --mono-a: #6e7280; --mono-b: #50535c; --shadow: none; --skel: rgba(118, 118, 128, 0.22);
     --sheet: #1c1c1e; --group: #2c2c2e;
     --sun: #ffc21a; --cloud: #9a9aa2; --moon: #d1d1d6;
-    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #008300; --c7: #9085e9; --c-other: #636366;
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767; --c-other: #636366;
     color-scheme: dark;
   }
 }
@@ -53,7 +53,7 @@
   --mono-a: #6e7280; --mono-b: #50535c; --shadow: none; --skel: rgba(118, 118, 128, 0.22);
     --sheet: #1c1c1e; --group: #2c2c2e;
     --sun: #ffc21a; --cloud: #9a9aa2; --moon: #d1d1d6;
-    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #008300; --c7: #9085e9; --c-other: #636366;
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767; --c-other: #636366;
   color-scheme: dark;
 }
 
@@ -295,6 +295,8 @@ details.tbl th { font-weight: 600; color: var(--label-2); }
 .danger { color: var(--red); font-weight: 500; justify-self: center; font-size: 15px; padding: 4px 10px; }
 
 /* Antippbare Widgets und Aufgaben-Detailansicht */
+.fin-glance { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+#fw-acct .widget-sub { white-space: normal; }
 .widget.tap { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
 .widget.tap:hover { box-shadow: var(--shadow), 0 0 0 1px var(--sep); }
 .widget.tap:active { transform: scale(.985); }
@@ -619,7 +621,8 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       <button type="button" class="add-ev" data-finadd="tx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Buchung</button>
     </div>
     <div id="fin-notice"></div>
-    <section class="glance" aria-label="Monat auf einen Blick">
+    <section class="glance fin-glance" aria-label="Monat auf einen Blick">
+      <div class="widget tap" id="fw-acct" role="button" tabindex="0" aria-haspopup="dialog" aria-label="Kontostand eintragen"></div>
       <div class="widget" id="fw-in"></div>
       <div class="widget" id="fw-out"></div>
       <div class="widget" id="fw-bal"></div>
@@ -781,7 +784,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     view: "uebersicht",
     fin: { tx: null, budgets: null, fixed: null, goals: null, depot: null, plans: null, exec: null }, finErr: null, finReadOnly: false,
     hist: null, histErr: null, depotSpan: null,
-    depotQuotes: undefined, depotErr: null,
+    depotQuotes: undefined, depotErr: null, balance: undefined,
     wx: undefined, wxErr: null,
     finMonth: { y: new Date().getFullYear(), m: new Date().getMonth() },
   };
@@ -1642,6 +1645,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     { id: "shopping", name: "Shopping", c: "var(--c5)" },
     { id: "gesundheit", name: "Gesundheit", c: "var(--c6)" },
     { id: "vertraege", name: "Abos & Verträge", c: "var(--c7)" },
+    { id: "mama", name: "Zahlungen für Mama", c: "var(--c8)" },
     { id: "sonstiges", name: "Sonstiges", c: "var(--c-other)" },
   ];
   const IN_CATS = [
@@ -1650,7 +1654,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     { id: "erstattung", name: "Erstattung", c: "var(--green)" },
     { id: "sonstiges-ein", name: "Sonstiges", c: "var(--green)" },
   ];
-  const catOf = (id, type) => (type === "in" ? IN_CATS : OUT_CATS).find((c) => c.id === id) || (type === "in" ? IN_CATS[3] : OUT_CATS[7]);
+  const catOf = (id, type) => (type === "in" ? IN_CATS : OUT_CATS).find((c) => c.id === id) || (type === "in" ? IN_CATS[IN_CATS.length - 1] : OUT_CATS.find((c) => c.id === "sonstiges"));
   const RHYTHM = { 1: "monatlich", 3: "vierteljährlich", 6: "halbjährlich", 12: "jährlich" };
 
   const EUR = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
@@ -1747,6 +1751,10 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       state.hist = h;
       renderDepot(); maybeFetchHist(); runPlans();
     }, onErr);
+    finCols.meta.doc("balance").onSnapshot((snap) => {
+      state.balance = snap.exists && snap.data() && typeof snap.data().amount === "number" ? snap.data() : null;
+      renderFinance();
+    }, onErr);
     finCols.meta.doc("mail").onSnapshot((snap) => {
       if (snap.exists && snap.data() && snap.data().date) {
         const d = snap.data();
@@ -1776,7 +1784,62 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
       <div class="widget-big money">${big}</div><div class="widget-sub">${sub}</div>`;
   }
 
+  // Kontostand: eingetragener Stand plus alle Buchungen danach (bis heute)
+  function accountNow() {
+    const b = state.balance;
+    if (!b) return null;
+    const todayK = dayKey(new Date());
+    let delta = 0;
+    for (const t of state.fin.tx || []) {
+      if (!t.date || t.date > todayK) continue;
+      const after = t.date > b.date || (t.date === b.date && (t.createdAt || 0) > (b.at || 0));
+      if (after) delta += t.type === "in" ? t.amount || 0 : -(t.amount || 0);
+    }
+    return { value: b.amount + delta, delta };
+  }
+  function renderAccount() {
+    const el = $("#fw-acct");
+    const head = '<div class="widget-head"><span class="dot" style="background:var(--blue)"></span>Kontostand<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></div>';
+    const acc = accountNow();
+    if (!acc) {
+      el.innerHTML = head + '<div class="widget-big" style="color:var(--label-3)">–</div><div class="widget-sub">Tippen, um deinen Kontostand einzutragen</div>';
+      return;
+    }
+    const b = state.balance;
+    const since = acc.delta ? ` · seitdem ${esc(signed(acc.delta))}` : "";
+    el.innerHTML = head + `<div class="widget-big money"${acc.value < 0 ? ' style="color:var(--red)"' : ""}>${acc.value < 0 ? "−" : ""}${esc(eur(Math.abs(acc.value)))}</div>
+      <div class="widget-sub">${b.name ? esc(b.name) + " · " : ""}abgeglichen ${esc(dateShort(b.date))}${since}</div>`;
+  }
+  function openAccountSheet() {
+    if (!finCols || state.finReadOnly) return;
+    const acc = accountNow();
+    const b = state.balance;
+    openSheet({
+      title: "Kontostand",
+      submit: "Sichern",
+      done: "Kontostand gesichert",
+      fields: [
+        { id: "sign", type: "seg", label: "Vorzeichen", value: acc && acc.value < 0 ? "minus" : "plus", options: [{ value: "plus", label: "Guthaben" }, { value: "minus", label: "Im Minus" }] },
+        { id: "amount", type: "amount", label: "Aktueller Stand", value: acc ? toInput(Math.abs(acc.value)) : "" },
+        { id: "date", type: "date", label: "Stand am", value: dayKey(new Date()) },
+        { id: "name", type: "text", label: "Konto (optional)", placeholder: "z. B. Girokonto", value: b && b.name ? b.name : "" },
+      ],
+      after: '<div class="hint-txt">Trag den Stand aus deiner Banking-App ein. Danach rechnet die Seite jede Buchung, die du erfasst, automatisch dazu oder ab. Weicht der Stand irgendwann ab, trägst du hier einfach den neuen Stand ein.</div>',
+      check(v) {
+        const raw = v.amount.trim();
+        const a = raw === "0" || raw === "0,00" ? 0 : needAmount(raw);
+        if (a == null) return "Gib den Kontostand ein, zum Beispiel 1.250,00.";
+        if (!v.date) return "Wähle das Datum, zu dem der Stand gilt.";
+        return { amount: v.sign === "minus" ? -a : a, date: v.date, name: v.name.trim(), at: Date.now() };
+      },
+      save: (d) => finCols.meta.doc("balance").set(d),
+    });
+  }
+  $("#fw-acct").addEventListener("click", openAccountSheet);
+  $("#fw-acct").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAccountSheet(); } });
+
   function renderFinWidgets(st) {
+    renderAccount();
     const budgets = state.fin.budgets || [];
     const totalBudget = budgets.reduce((a, b) => a + (b.amount || 0), 0);
     const spentBudgeted = budgets.reduce((a, b) => a + (st.byCat[b.id] || 0), 0);
@@ -2010,7 +2073,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     if (!finLoaded()) {
       const sk = state.finErr ? "" : SKELETON;
       for (const id of ["#fin-budget", "#fin-trend", "#fin-tx", "#fin-fixed", "#fin-goals"]) $(id).innerHTML = sk;
-      for (const id of ["#fw-in", "#fw-out", "#fw-bal", "#fw-fix"]) $(id).innerHTML = `<div class="widget-sub">${state.finErr ? "Nicht verfügbar" : "Lädt …"}</div>`;
+      for (const id of ["#fw-acct", "#fw-in", "#fw-out", "#fw-bal", "#fw-fix"]) $(id).innerHTML = `<div class="widget-sub">${state.finErr ? "Nicht verfügbar" : "Lädt …"}</div>`;
       return;
     }
     const st = monthStats(ym);
