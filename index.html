@@ -297,6 +297,11 @@ details.tbl th { font-weight: 600; color: var(--label-2); }
 /* Antippbare Widgets und Aufgaben-Detailansicht */
 .fin-glance { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 #fw-acct .widget-sub { white-space: normal; }
+.pend button { align-items: center; justify-content: flex-start; }
+.pend button > span:nth-child(2) { flex: 1; min-width: 0; }
+.pend button[aria-checked="true"] .check { background: var(--blue); border-color: var(--blue); }
+.pend button[aria-checked="true"] .check svg { opacity: 1; }
+.pend-label { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--label-2); padding: 0 4px; }
 .widget.tap { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
 .widget.tap:hover { box-shadow: var(--shadow), 0 0 0 1px var(--sep); }
 .widget.tap:active { transform: scale(.985); }
@@ -1790,9 +1795,10 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     if (!b) return null;
     const todayK = dayKey(new Date());
     let delta = 0;
+    const pending = new Set(b.pending || []);
     for (const t of state.fin.tx || []) {
       if (!t.date || t.date > todayK) continue;
-      const after = t.date > b.date || (t.date === b.date && (t.createdAt || 0) > (b.at || 0));
+      const after = pending.has(t.id) || t.date > b.date || (t.date === b.date && (t.createdAt || 0) > (b.at || 0));
       if (after) delta += t.type === "in" ? t.amount || 0 : -(t.amount || 0);
     }
     return { value: b.amount + delta, delta };
@@ -1810,6 +1816,28 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     el.innerHTML = head + `<div class="widget-big money"${acc.value < 0 ? ' style="color:var(--red)"' : ""}>${acc.value < 0 ? "−" : ""}${esc(eur(Math.abs(acc.value)))}</div>
       <div class="widget-sub">${b.name ? esc(b.name) + " · " : ""}abgeglichen ${esc(dateShort(b.date))}${since}</div>`;
   }
+  function pendingHTML(b) {
+    const todayK = dayKey(new Date());
+    const recent = [...(state.fin.tx || [])].filter((t) => t.date && t.date <= todayK)
+      .sort((x, y) => (x.date < y.date ? 1 : x.date > y.date ? -1 : (y.createdAt || 0) - (x.createdAt || 0))).slice(0, 8);
+    if (!recent.length) return "";
+    const on = new Set((b && b.pending) || []);
+    return `<div class="pend-label">Noch nicht abgebucht?</div>
+      <div class="sym-res pend" role="group" aria-label="Buchungen, die im Stand noch fehlen">${recent.map((t) => {
+        const c = catOf(t.category, t.type);
+        const amt = t.type === "in" ? `+${eur(t.amount)}` : `−${eur(t.amount)}`;
+        return `<button type="button" role="checkbox" aria-checked="${on.has(t.id)}" data-pendtx="${esc(t.id)}">
+          <span class="check" aria-hidden="true">${ICON_CHECK}</span>
+          <span><b>${esc(t.note || c.name)}</b><small>${esc(c.name)} · ${esc(dateShort(t.date))}</small></span>
+          <span class="money">${esc(amt)}</span>
+        </button>`;
+      }).join("")}</div>
+      <div class="hint-txt">Hake Buchungen an, die du schon erfasst hast, die in dem Stand oben aber noch nicht abgezogen bzw. gutgeschrieben sind.</div>`;
+  }
+  $("#fin-dialog").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-pendtx]");
+    if (b) b.setAttribute("aria-checked", String(b.getAttribute("aria-checked") !== "true"));
+  });
   function openAccountSheet() {
     if (!finCols || state.finReadOnly) return;
     const acc = accountNow();
@@ -1824,13 +1852,14 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
         { id: "date", type: "date", label: "Stand am", value: dayKey(new Date()) },
         { id: "name", type: "text", label: "Konto (optional)", placeholder: "z. B. Girokonto", value: b && b.name ? b.name : "" },
       ],
-      after: '<div class="hint-txt">Trag den Stand aus deiner Banking-App ein. Danach rechnet die Seite jede Buchung, die du erfasst, automatisch dazu oder ab. Weicht der Stand irgendwann ab, trägst du hier einfach den neuen Stand ein.</div>',
+      after: '<div class="hint-txt">Trag den Stand aus deiner Banking-App ein. Danach rechnet die Seite jede Buchung, die du erfasst, automatisch dazu oder ab. Weicht der Stand irgendwann ab, trägst du hier einfach den neuen Stand ein.</div>' + pendingHTML(b),
       check(v) {
         const raw = v.amount.trim();
         const a = raw === "0" || raw === "0,00" ? 0 : needAmount(raw);
         if (a == null) return "Gib den Kontostand ein, zum Beispiel 1.250,00.";
         if (!v.date) return "Wähle das Datum, zu dem der Stand gilt.";
-        return { amount: v.sign === "minus" ? -a : a, date: v.date, name: v.name.trim(), at: Date.now() };
+        const pending = [...document.querySelectorAll('#fin-fields [data-pendtx][aria-checked="true"]')].map((x) => x.dataset.pendtx);
+        return { amount: v.sign === "minus" ? -a : a, date: v.date, name: v.name.trim(), at: Date.now(), pending };
       },
       save: (d) => finCols.meta.doc("balance").set(d),
     });
