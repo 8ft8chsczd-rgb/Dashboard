@@ -232,13 +232,13 @@ a.row:hover, .row.hoverable:hover { background: var(--fill-2); }
 .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .amt-in { color: var(--green); }
 .stackbar { display: flex; gap: 2px; height: 14px; margin: 0 18px 10px; }
-.stackbar span { min-width: 3px; background: var(--cat); }
+.stackbar span { min-width: 3px; background: var(--catbg, var(--cat)); }
 .stackbar span:first-child { border-radius: 4px 0 0 4px; }
 .stackbar span:last-child { border-radius: 0 4px 4px 0; }
 .stackbar span:only-child { border-radius: 4px; }
 .cat-row { --inset: 40px; width: 100%; text-align: left; display: block; }
 .cat-line { display: flex; align-items: center; gap: 12px; }
-.cat-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cat); flex-shrink: 0; }
+.cat-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--catbg, var(--cat)); flex-shrink: 0; }
 .cat-name { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cat-row.idle .cat-name, .cat-row.idle .money { color: var(--label-3); }
 .cat-sub { margin: 6px 0 0 22px; display: grid; gap: 4px; font-size: 13px; color: var(--label-2); }
@@ -1651,6 +1651,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     { id: "gesundheit", name: "Gesundheit", c: "var(--c6)" },
     { id: "vertraege", name: "Abos & Verträge", c: "var(--c7)" },
     { id: "mama", name: "Zahlungen für Mama", c: "var(--c8)" },
+    { id: "saufen", name: "Saufen", c: "var(--c4)", bg: "repeating-linear-gradient(135deg, var(--c4) 0 2.5px, color-mix(in srgb, var(--c4) 35%, var(--card)) 2.5px 5px)" },
     { id: "sonstiges", name: "Sonstiges", c: "var(--c-other)" },
   ];
   const IN_CATS = [
@@ -1896,7 +1897,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
     const used = OUT_CATS.filter((c) => st.byCat[c.id] > 0);
     let html = used.length
       ? `<div class="stackbar" role="img" aria-label="Anteile der Ausgaben je Kategorie">${used.map((c) =>
-          `<span style="--cat:${c.c};flex:${st.byCat[c.id]} 1 0" title="${esc(c.name)}: ${esc(eur(st.byCat[c.id]))} (${Math.round((st.byCat[c.id] / st.expense) * 100)} %)"></span>`).join("")}</div>`
+          `<span style="--cat:${c.c};${c.bg ? `--catbg:${c.bg};` : ""}flex:${st.byCat[c.id]} 1 0" title="${esc(c.name)}: ${esc(eur(st.byCat[c.id]))} (${Math.round((st.byCat[c.id] / st.expense) * 100)} %)"></span>`).join("")}</div>`
       : "";
     const rows = [...OUT_CATS].sort((a, b) => (st.byCat[b.id] || 0) - (st.byCat[a.id] || 0) || (budgets[b.id] || 0) - (budgets[a.id] || 0));
     html += '<ul class="list">';
@@ -1911,7 +1912,7 @@ dialog.sheet-dlg::backdrop { background: rgba(0, 0, 0, 0.32); }
         const note = pct > 1 ? `<span class="over">${esc(eur(spent - bud))} über Budget</span>` : `noch ${esc(eur(bud - spent))} von ${esc(eur(bud))} übrig`;
         sub = `<span class="cat-sub"><span class="meter" style="--meter:${color}"><i style="width:${Math.min(100, pct * 100).toFixed(1)}%"></i></span><span>${note} · ${Math.round(pct * 100)} %</span></span>`;
       }
-      html += `<li><button type="button" class="row cat-row hoverable${idle ? " idle" : ""}" data-budget="${c.id}" aria-label="${esc(c.name)}: ${esc(eur(spent))} ausgegeben${bud ? `, Budget ${esc(eur(bud))}` : ""}. Budget festlegen" style="--cat:${c.c}">
+      html += `<li><button type="button" class="row cat-row hoverable${idle ? " idle" : ""}" data-budget="${c.id}" aria-label="${esc(c.name)}: ${esc(eur(spent))} ausgegeben${bud ? `, Budget ${esc(eur(bud))}` : ""}. Budget festlegen" style="--cat:${c.c}${c.bg ? `;--catbg:${c.bg}` : ""}">
         <span class="cat-line"><span class="cat-dot"></span><span class="cat-name">${esc(c.name)}</span><span class="money">${esc(eur(spent))}</span></span>${sub}
       </button></li>`;
     }
