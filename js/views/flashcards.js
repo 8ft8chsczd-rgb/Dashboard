@@ -133,12 +133,14 @@ export async function renderFlashcards(el, id) {
     card.style.setProperty('--bad', Math.max(0, Math.min(1, -p)).toFixed(3));
   }
 
+  let flipToken = 0;
+  const flipper = q('.flipper');
+
   function resetFlip() {
+    flipToken += 1; // laufende Umdreh-Animation abbrechen
+    flipper.getAnimations().forEach((a) => a.cancel());
     flipped = false;
-    card.classList.add('instant');
     card.classList.remove('flipped');
-    void card.offsetWidth;
-    card.classList.remove('instant');
   }
 
   function actionsHtml() {
@@ -261,10 +263,29 @@ export async function renderFlashcards(el, id) {
 
   // ---------- Aktionen ----------
 
-  function flip() {
+  // Umdrehen in zwei Hälften: bis 90° (hochkant) drehen, Seite tauschen, von −90° zurück auf 0°.
+  // So wird nie eine Seite von hinten gezeigt – funktioniert in Safari zuverlässig.
+  async function flip() {
     if (busy || !currentCard()) return;
-    flipped = !flipped;
-    card.classList.toggle('flipped', flipped);
+    const mine = ++flipToken;
+    const target = !flipped;
+    const show = () => { flipped = target; card.classList.toggle('flipped', target); };
+    if (reducedMotion()) { show(); return; }
+
+    flipper.getAnimations().forEach((a) => a.cancel());
+    const dir = target ? 1 : -1;
+    const first = flipper.animate(
+      [{ transform: 'rotateY(0deg)' }, { transform: `rotateY(${dir * 90}deg)` }],
+      { duration: 160, easing: 'cubic-bezier(.45,0,.9,.6)', fill: 'forwards' },
+    );
+    try { await first.finished; } catch { return; } // abgebrochen
+    if (mine !== flipToken) return;
+    show();
+    flipper.animate(
+      [{ transform: `rotateY(${-dir * 90}deg)` }, { transform: 'rotateY(0deg)' }],
+      { duration: 260, easing: 'cubic-bezier(.1,.6,.25,1)' },
+    );
+    first.cancel();
   }
 
   function know() {
