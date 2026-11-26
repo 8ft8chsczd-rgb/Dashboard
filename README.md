@@ -32,8 +32,13 @@ Der Lernfortschritt wird **pro Gerät** gespeichert (iPad und iPhone haben jewei
 
 Die App besteht nur aus statischen Dateien, es ist kein Build-Schritt nötig.
 
-- **Netlify** (kostenlos, funktioniert mit privatem Repo): „Add new site“ → „Import an existing project“ → GitHub → Repo wählen → Build command leer lassen, Publish directory `.` → Deploy.
-- **GitHub Pages**: Settings → Pages → „Deploy from a branch“. Bei privaten Repos ist dafür GitHub Pro nötig.
+**GitHub Pages** (empfohlen, aktualisiert sich bei jedem Push automatisch):
+
+1. Repo öffentlich machen: Settings → General → ganz unten „Danger Zone“ → „Change repository visibility“ → „Change to public“. (Alternativ privat lassen mit GitHub Pro, 4 $/Monat.)
+2. Settings → Pages → Source „Deploy from a branch“ → Branch `claude/uni-learning-app-iz3136`, Ordner `/ (root)` → Save.
+3. Nach 1–2 Minuten ist die App unter `https://<benutzername>.github.io/Dashboard/` erreichbar.
+
+Hinweis: Netlify und Vercel blockieren im Gratis-Plan Deploys aus privaten Repos, wenn Commits nicht vom Kontoinhaber selbst stammen (z. B. von Claude). Dafür also nicht geeignet.
 
 Lokal testen: `python3 -m http.server` im Projektordner, dann `http://localhost:8000` öffnen.
 
