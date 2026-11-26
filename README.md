@@ -5,12 +5,14 @@ Schlichte Lern-App für die Uni-Fächer im iOS-Look (Dark Mode). Läuft als Web-
 ## Funktionen
 
 - **Fächer-Übersicht** mit Lernfortschritt pro Fach
+- **Kapitel**: Auf der Fach-Seite „Alle Kapitel“ oder einzelne Kapitel auswählen (mit Fortschritt pro Kapitel). Die Auswahl gilt für Karteikarten und Quiz und lässt sich dort über das Filter-Symbol ändern.
 - **Karteikarten**
   - Karte **antippen** → umdrehen (Vorderseite = Frage, Rückseite = Antwort, liniert wie eine echte Karteikarte)
   - **„Kann ich“** (oder nach rechts wischen) → Karte wandert auf den Stapel **„Gekonnt“**
   - **„Nochmal“** (oder nach links wischen) → Karte bleibt im **Lernstapel**
   - Gekonnt-Stapel ansehen und Karten mit **„Wieder lernen“** zurücklegen
   - Rückgängig, Mischen, Fortschritt zurücksetzen
+  - **Skizzen** auf Vorder- oder Rückseite; Lupe oben rechts öffnet sie im Vollbild (Zwei-Finger-Zoom, Doppeltippen)
 - **Quiz** (Multiple Choice)
   - eigene Quizfragen (auch mit mehreren richtigen Antworten und Erklärung)
   - plus automatisch erzeugte Fragen aus den Karteikarten (falsche Antworten = Rückseiten anderer Karten)
@@ -79,13 +81,40 @@ Jedes Fach ist eine JSON-Datei in `data/`. Neue Fächer zusätzlich in `data/ind
 | `id` | Kurzname ohne Leerzeichen (optional, sonst Dateiname) |
 | `name`, `icon`, `color` | Anzeigename, Emoji, Farbe (`blau`, `grün`, `orange`, `rot`, `lila`, `pink`, `türkis`, `indigo`, `gelb` oder `#hex`) |
 | `cards[].front` / `back` | Vorder- und Rückseite (`vorne`/`hinten` geht auch) |
-| `cards[].topic` | optional: Kapitel/Thema, wird klein oben auf der Karte angezeigt |
+| `cards[].topic` | Kapitel (`kapitel` geht auch), wird klein oben auf der Karte angezeigt |
+| `cards[].frontImage` / `backImage` | optional: Skizze auf Vorder-/Rückseite. Eine Seite darf auch nur aus einer Skizze bestehen. |
 | `quiz[].options` | 2–10 Antwortmöglichkeiten |
 | `quiz[].correct` | Buchstabe (`"B"`), Liste (`["A","C"]`) bei mehreren richtigen Antworten, oder `true`/`false` für Richtig/Falsch-Fragen ohne `options` |
 | `quiz[].explanation` | optional: Erklärung nach dem Beantworten |
-| `frontImage` / `backImage` / `image` | optional: Bildpfad, z. B. `data/bilder/skizze.png` |
+| `quiz[].image` | optional: Skizze zur Frage |
+| `quiz[].topic` | Kapitel, **genau gleich geschrieben** wie bei den Karten |
+| `invertImages` | optional (pro Fach): `true` färbt Schwarz-auf-weiß-Skizzen für den Dark Mode um (helle Linien auf Kartenfarbe). Pro Karte/Frage mit `"invert": true/false` überschreibbar. |
 
 Die Antworten im Quiz werden automatisch gemischt (außer bei „Alle genannten“, „Keine der …“ usw.).
+
+### Kapitel
+
+Zwei Möglichkeiten, beide funktionieren:
+
+1. **Flach:** Jede Karte/Frage bekommt `"topic": "Kapitelname"`. Optional legt `"chapters": ["Kapitel 1", "Kapitel 2"]` die Reihenfolge fest.
+2. **Verschachtelt:** Karten und Fragen direkt unter ihrem Kapitel:
+
+```json
+{
+  "name": "Baustoffkunde",
+  "chapters": [
+    { "name": "Beton", "cards": [ … ], "quiz": [ … ] },
+    { "name": "Stahl", "cards": [ … ], "quiz": [ … ] }
+  ]
+}
+```
+
+### Skizzen
+
+- Bilder in `data/bilder/<fach>/` ablegen, z. B. `data/bilder/baustatik/einfeldtraeger.png`.
+- In der Datei reicht der Pfad ab `bilder/`: `"backImage": "bilder/baustatik/einfeldtraeger.png"`.
+- Formate: PNG, JPG, WebP oder SVG (SVG bitte mit `width`/`height`). Am besten auf ca. 1600 px Breite verkleinern, damit die App schnell bleibt.
+- Skizzen werden beim ersten Öffnen für die Offline-Nutzung gespeichert.
 
 ### Formatierung in Texten
 
@@ -112,6 +141,7 @@ Erstelle Quizfragen zu [THEMA] als JSON-Array in genau diesem Format:
 ]
 
 Regeln:
+- "topic" ist der Kapitelname, exakt so geschrieben wie in meinen Karteikarten: [KAPITELNAMEN EINFÜGEN].
 - "correct" ist der Buchstabe der richtigen Antwort (A = erste Option).
 - Bei mehreren richtigen Antworten: "correct": ["A", "C"] und das in der Frage erwähnen.
 - Richtig/Falsch-Fragen ohne "options", mit "correct": true oder false.

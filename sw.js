@@ -1,7 +1,7 @@
 // Service Worker: macht die App offline nutzbar.
 // Strategie "Netz zuerst": Online gibt es immer die neuesten Inhalte, offline den Cache.
 // Bei Änderungen an der App die Versionsnummer erhöhen.
-const CACHE = 'lernen-v1';
+const CACHE = 'lernen-v2';
 
 const SHELL = [
   './',
@@ -11,6 +11,8 @@ const SHELL = [
   './js/app.js',
   './js/ui.js',
   './js/store.js',
+  './js/viewer.js',
+  './js/chapters.js',
   './js/views/home.js',
   './js/views/subject.js',
   './js/views/flashcards.js',
@@ -22,15 +24,41 @@ const SHELL = [
   './data/index.json',
 ];
 
+const IMAGE = /\.(png|jpe?g|webp|gif|svg|avif)$/i;
+
+// Alle Bildpfade aus einer Fach-Datei einsammeln (egal in welchem Feld sie stehen).
+function collectImages(node, out) {
+  if (typeof node === 'string') {
+    if (IMAGE.test(node.trim())) out.add(node.trim());
+  } else if (Array.isArray(node)) {
+    node.forEach((n) => collectImages(n, out));
+  } else if (node && typeof node === 'object') {
+    Object.values(node).forEach((n) => collectImages(n, out));
+  }
+  return out;
+}
+
+const resolve = (p) => (/^(https?:|data:|\/|\.\/|data\/)/i.test(p) ? p : `data/${p}`);
+
 async function precache() {
   const cache = await caches.open(CACHE);
   await cache.addAll(SHELL);
-  // Alle Fach-Dateien gleich mit ablegen, damit sie auch offline da sind.
+  // Alle Fach-Dateien und Skizzen gleich mit ablegen, damit sie auch offline da sind.
   try {
     const res = await fetch('./data/index.json', { cache: 'no-cache' });
     const index = await res.json();
     const files = Array.isArray(index) ? index : (index.subjects || index.faecher || []);
-    await cache.addAll(files.map((f) => `./data/${f}`));
+    const images = new Set();
+    await Promise.allSettled(files.map(async (f) => {
+      const r = await fetch(`./data/${f}`, { cache: 'no-cache' });
+      if (!r.ok) return;
+      await cache.put(`./data/${f}`, r.clone());
+      collectImages(await r.json(), images);
+    }));
+    await Promise.allSettled([...images]
+      .map(resolve)
+      .filter((p) => !/^(https?:|data:)/i.test(p))
+      .map((p) => cache.add(p.startsWith('./') || p.startsWith('/') ? p : `./${p}`)));
   } catch {
     /* nicht kritisch */
   }

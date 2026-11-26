@@ -3,6 +3,7 @@ import { renderSubject } from './views/subject.js';
 import { renderFlashcards } from './views/flashcards.js';
 import { renderQuiz } from './views/quiz.js';
 import { esc, navbar, reducedMotion } from './ui.js';
+import { openViewer } from './viewer.js';
 
 const routes = [
   { re: /^\/?$/, render: renderHome, depth: 0 },
@@ -68,6 +69,31 @@ document.addEventListener('click', (e) => {
     history.back();
   }
 });
+
+// Skizze vergrößern: Lupen-Button auf Karten, im Quiz auch Antippen des Bildes
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-zoom]');
+  const img = !btn && e.target.closest('.tap-zoom .card-img');
+  if (!btn && !img) return;
+  const ref = btn || img.parentElement.querySelector('[data-zoom]');
+  e.preventDefault();
+  e.stopPropagation();
+  openViewer(ref.dataset.zoom, { invert: ref.dataset.invert === '1' });
+});
+
+// Fehlende Bilder sichtbar machen, statt ein kaputtes Symbol zu zeigen
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.classList.contains('card-img')) return;
+  const fig = img.closest('.card-fig');
+  if (!fig) return;
+  const missing = document.createElement('div');
+  missing.className = 'img-missing';
+  missing.textContent = `Bild nicht gefunden: ${img.getAttribute('src')}`;
+  const zoom = fig.closest('.face')?.querySelector('.face-zoom');
+  if (zoom) zoom.innerHTML = '';
+  fig.replaceWith(missing);
+}, true);
 
 window.addEventListener('hashchange', navigate);
 navigate();

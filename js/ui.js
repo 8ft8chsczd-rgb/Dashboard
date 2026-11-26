@@ -81,18 +81,45 @@ export const icons = {
   checkCircle: `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="currentColor"/><path d="M7.4 12.4l3.1 3.1 6.1-6.6" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   xCircle: `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="currentColor"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></svg>`,
   warning: svg('<path d="M12 3.5 2.5 20h19L12 3.5z"/><path d="M12 10v4.5M12 17.3v.2"/>'),
+  zoom: svg('<path d="M14 4h6v6M10 20H4v-6M20 4l-6.2 6.2M4 20l6.2-6.2"/>'),
+  filter: svg('<path d="M4 7h16M7 12h10M10 17h4"/>'),
 };
 
+// Kleiner Fortschrittsring (z. B. pro Kapitel)
+export function miniRing(done, total) {
+  const c = 2 * Math.PI * 8;
+  const p = total ? done / total : 0;
+  return `<svg class="mini-ring" viewBox="0 0 22 22" aria-hidden="true">
+    <circle cx="11" cy="11" r="8" class="mr-bg"/>
+    <circle cx="11" cy="11" r="8" class="mr-fg" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${(c * (1 - p)).toFixed(2)}"/>
+  </svg>`;
+}
+
+// Lupen-Button: öffnet die Skizze im Vollbild
+export function zoomBtn(src, invert = false, cls = '') {
+  return `<button type="button" class="zoom-btn ${cls}" data-zoom="${esc(src)}" data-invert="${invert ? 1 : 0}" aria-label="Skizze vergrößern">${icons.zoom}</button>`;
+}
+
+// Bild (Skizze), optional mit Lupen-Button
+export function figureHtml(src, { invert = false, cls = '', button = true } = {}) {
+  if (!src) return '';
+  return `<figure class="card-fig ${cls}">
+    <img class="card-img${invert ? ' inv' : ''}" src="${esc(src)}" alt="Skizze" draggable="false">
+    ${button ? zoomBtn(src, invert) : ''}
+  </figure>`;
+}
+
 // Navigationsleiste im iOS-Stil. large: Titel erscheint erst beim Scrollen (Large Title).
-export function navbar({ back, title = '', right = '', large = false, plain = false } = {}) {
+export function navbar({ back, title = '', subtitle = null, right = '', large = false, plain = false } = {}) {
   const backHtml = back
     ? `<a class="nav-back" href="${esc(back.href)}" data-back aria-label="Zurück zu ${esc(back.label)}">${icons.chevronLeft}<span>${esc(back.label)}</span></a>`
     : '';
   const cls = large ? 'has-large' : plain ? 'plain' : 'solid';
+  const sub = subtitle !== null ? `<span class="nav-subtitle">${esc(subtitle)}</span>` : '';
   return `<header class="navbar ${cls}">
     <div class="navbar-inner">
       <div class="nav-side nav-left">${backHtml}</div>
-      <div class="nav-title">${esc(title)}</div>
+      <div class="nav-title"><span class="nav-title-main">${esc(title)}</span>${sub}</div>
       <div class="nav-side nav-right">${right}</div>
     </div>
   </header>`;

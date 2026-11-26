@@ -4,6 +4,8 @@
   "icon": "📐",
   "color": "blau",
   "description": "Beispielinhalte – werden durch deine eigenen Karten ersetzt.",
+  "invertImages": true,
+  "chapters": ["Statik", "Lager", "Schnittgrößen", "Festigkeitslehre"],
   "cards": [
     {
       "front": "Welche drei Gleichgewichtsbedingungen gelten für ein ebenes System?",
@@ -32,7 +34,14 @@
     },
     {
       "front": "Maximales Feldmoment eines Einfeldträgers unter Gleichstreckenlast q",
-      "back": "M_{max} = q · l^2 / 8\n\nEs tritt in Feldmitte auf.",
+      "back": "M_{max} = q · l^2 / 8 in Feldmitte",
+      "backImage": "bilder/technische-mechanik/einfeldtraeger-q.svg",
+      "topic": "Schnittgrößen"
+    },
+    {
+      "front": "Welches statische System ist dargestellt? Wo liegt das maximale Moment?",
+      "frontImage": "bilder/technische-mechanik/kragtraeger-f.svg",
+      "back": "Kragträger (einseitig eingespannt) mit Einzellast am Ende.\n\nM_{max} = F · l an der Einspannung.",
       "topic": "Schnittgrößen"
     },
     {
@@ -63,6 +72,14 @@
       "correct": "C",
       "explanation": "Eine Einspannung verhindert beide Verschiebungen und die Verdrehung, also zwei Kräfte und ein Moment.",
       "topic": "Lager"
+    },
+    {
+      "question": "Wo tritt beim dargestellten System das betragsmäßig größte Biegemoment auf?",
+      "image": "bilder/technische-mechanik/kragtraeger-f.svg",
+      "options": ["An der Einspannung", "In Trägermitte", "Am freien Ende unter der Last", "Das Moment ist überall gleich"],
+      "correct": "A",
+      "explanation": "Beim Kragträger mit Endlast wächst das Moment linear vom freien Ende (M = 0) bis zur Einspannung auf M = F · l.",
+      "topic": "Schnittgrößen"
     },
     {
       "question": "Wie groß ist das maximale Biegemoment eines Einfeldträgers unter Gleichstreckenlast q?",

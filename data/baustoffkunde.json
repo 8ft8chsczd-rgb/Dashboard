@@ -4,81 +4,88 @@
   "icon": "🧱",
   "color": "orange",
   "description": "Beispielinhalte – werden durch deine eigenen Karten ersetzt.",
-  "cards": [
+  "chapters": [
     {
-      "front": "Rohdichte von Normalbeton",
-      "back": "Über 2.000 bis 2.600 kg/m^3 (ofentrocken)\n\nTypischer Rechenwert für unbewehrten Beton: ca. 24 kN/m^3.",
-      "topic": "Beton"
-    },
-    {
-      "front": "Was bedeutet die Bezeichnung C30/37?",
-      "back": "Betondruckfestigkeitsklasse:\n\n- 30 = charakteristische Zylinderdruckfestigkeit f_{ck} in N/mm^2\n- 37 = charakteristische Würfeldruckfestigkeit f_{ck,cube} in N/mm^2",
-      "topic": "Beton"
-    },
-    {
-      "front": "Wasserzementwert (w/z-Wert)",
-      "back": "Verhältnis von Wassermasse zu Zementmasse: w/z = w / z\n\nNiedriger w/z-Wert → höhere Festigkeit, geringere Porosität, bessere Dauerhaftigkeit.",
-      "topic": "Beton"
-    },
-    {
-      "front": "Hydratation",
-      "back": "Chemische Reaktion von Zement mit Wasser. Dabei entstehen v. a. Calciumsilikathydrate (CSH-Phasen), die den Zementstein bilden. Es wird Wärme frei.",
-      "topic": "Beton"
-    },
-    {
-      "front": "Was bedeutet B500B?",
-      "back": "Betonstahl mit\n\n- charakteristischer Streckgrenze f_{yk} = 500 N/mm^2\n- Duktilitätsklasse B (hohe Duktilität)",
-      "topic": "Stahl"
-    },
-    {
-      "front": "Elastizitätsmodul von Baustahl",
-      "back": "E ≈ 210.000 N/mm^2",
-      "topic": "Stahl"
-    },
-    {
-      "front": "Karbonatisierung",
-      "back": "CO_{2} aus der Luft reagiert mit dem Calciumhydroxid im Beton. Der pH-Wert sinkt von ca. 12,5 auf unter 9. Dadurch geht der Korrosionsschutz der Bewehrung verloren.",
-      "topic": "Dauerhaftigkeit"
-    },
-    {
-      "front": "Kriechen",
-      "back": "Zeitabhängige Zunahme der Verformung unter dauerhaft wirkender Last.",
-      "topic": "Dauerhaftigkeit"
-    }
-  ],
-  "quiz": [
-    {
-      "question": "Was gibt die Zahl 37 in der Bezeichnung C30/37 an?",
-      "options": [
-        "Zylinderdruckfestigkeit in N/mm^2",
-        "Würfeldruckfestigkeit in N/mm^2",
-        "Zugfestigkeit in N/mm^2",
-        "Mindestzementgehalt in kg/m^3"
+      "name": "Beton",
+      "cards": [
+        {
+          "front": "Rohdichte von Normalbeton",
+          "back": "Über 2.000 bis 2.600 kg/m^3 (ofentrocken)\n\nTypischer Rechenwert für unbewehrten Beton: ca. 24 kN/m^3."
+        },
+        {
+          "front": "Was bedeutet die Bezeichnung C30/37?",
+          "back": "Betondruckfestigkeitsklasse:\n\n- 30 = charakteristische Zylinderdruckfestigkeit f_{ck} in N/mm^2\n- 37 = charakteristische Würfeldruckfestigkeit f_{ck,cube} in N/mm^2"
+        },
+        {
+          "front": "Wasserzementwert (w/z-Wert)",
+          "back": "Verhältnis von Wassermasse zu Zementmasse: w/z = w / z\n\nNiedriger w/z-Wert → höhere Festigkeit, geringere Porosität, bessere Dauerhaftigkeit."
+        },
+        {
+          "front": "Hydratation",
+          "back": "Chemische Reaktion von Zement mit Wasser. Dabei entstehen v. a. Calciumsilikathydrate (CSH-Phasen), die den Zementstein bilden. Es wird Wärme frei."
+        }
       ],
-      "correct": "B",
-      "explanation": "Die erste Zahl ist die Zylinder-, die zweite die Würfeldruckfestigkeit (jeweils charakteristisch).",
-      "topic": "Beton"
+      "quiz": [
+        {
+          "question": "Was gibt die Zahl 37 in der Bezeichnung C30/37 an?",
+          "options": [
+            "Zylinderdruckfestigkeit in N/mm^2",
+            "Würfeldruckfestigkeit in N/mm^2",
+            "Zugfestigkeit in N/mm^2",
+            "Mindestzementgehalt in kg/m^3"
+          ],
+          "correct": "B",
+          "explanation": "Die erste Zahl ist die Zylinder-, die zweite die Würfeldruckfestigkeit (jeweils charakteristisch)."
+        },
+        {
+          "question": "Welche Folgen hat ein höherer w/z-Wert?",
+          "options": ["Geringere Festigkeit", "Höhere Porosität", "Höhere Dichtigkeit", "Bessere Dauerhaftigkeit"],
+          "correct": ["A", "B"],
+          "explanation": "Überschüssiges Wasser hinterlässt Kapillarporen. Der Beton wird weniger fest und weniger dicht."
+        }
+      ]
     },
     {
-      "question": "Welche Folgen hat ein höherer w/z-Wert?",
-      "options": ["Geringere Festigkeit", "Höhere Porosität", "Höhere Dichtigkeit", "Bessere Dauerhaftigkeit"],
-      "correct": ["A", "B"],
-      "explanation": "Überschüssiges Wasser hinterlässt Kapillarporen. Der Beton wird weniger fest und weniger dicht.",
-      "topic": "Beton"
+      "name": "Stahl",
+      "cards": [
+        {
+          "front": "Was bedeutet B500B?",
+          "back": "Betonstahl mit\n\n- charakteristischer Streckgrenze f_{yk} = 500 N/mm^2\n- Duktilitätsklasse B (hohe Duktilität)"
+        },
+        {
+          "front": "Elastizitätsmodul von Baustahl",
+          "back": "E ≈ 210.000 N/mm^2"
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Wie groß ist der E-Modul von Baustahl ungefähr?",
+          "options": ["21.000 N/mm^2", "70.000 N/mm^2", "210.000 N/mm^2", "2.100.000 N/mm^2"],
+          "correct": "C",
+          "explanation": "Baustahl: ca. 210.000 N/mm^2. 70.000 N/mm^2 entspricht etwa Aluminium."
+        }
+      ]
     },
     {
-      "question": "Wie groß ist der E-Modul von Baustahl ungefähr?",
-      "options": ["21.000 N/mm^2", "70.000 N/mm^2", "210.000 N/mm^2", "2.100.000 N/mm^2"],
-      "correct": "C",
-      "explanation": "Baustahl: ca. 210.000 N/mm^2. 70.000 N/mm^2 entspricht etwa Aluminium.",
-      "topic": "Stahl"
-    },
-    {
-      "question": "Was sinkt im Beton durch die Karbonatisierung?",
-      "options": ["Der pH-Wert", "Die Rohdichte", "Der E-Modul der Bewehrung", "Die Betondeckung"],
-      "correct": "A",
-      "explanation": "Durch die Reaktion mit CO_{2} sinkt der pH-Wert, die Passivierung der Bewehrung geht verloren.",
-      "topic": "Dauerhaftigkeit"
+      "name": "Dauerhaftigkeit",
+      "cards": [
+        {
+          "front": "Karbonatisierung",
+          "back": "CO_{2} aus der Luft reagiert mit dem Calciumhydroxid im Beton. Der pH-Wert sinkt von ca. 12,5 auf unter 9. Dadurch geht der Korrosionsschutz der Bewehrung verloren."
+        },
+        {
+          "front": "Kriechen",
+          "back": "Zeitabhängige Zunahme der Verformung unter dauerhaft wirkender Last."
+        }
+      ],
+      "quiz": [
+        {
+          "question": "Was sinkt im Beton durch die Karbonatisierung?",
+          "options": ["Der pH-Wert", "Die Rohdichte", "Der E-Modul der Bewehrung", "Die Betondeckung"],
+          "correct": "A",
+          "explanation": "Durch die Reaktion mit CO_{2} sinkt der pH-Wert, die Passivierung der Bewehrung geht verloren."
+        }
+      ]
     }
   ]
 }

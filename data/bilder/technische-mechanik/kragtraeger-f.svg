@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300" font-family="Helvetica, Arial, sans-serif">
+  <rect width="600" height="300" fill="#fff"/>
+  <g stroke="#111" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Einspannung (Wand) -->
+    <path d="M110 70v160" stroke-width="5"/>
+    <path d="M110 80l-22 18M110 104l-22 18M110 128l-22 18M110 152l-22 18M110 176l-22 18M110 200l-22 18M110 224l-22 18" stroke-width="2"/>
+    <!-- Träger -->
+    <path d="M110 150H480" stroke-width="6"/>
+    <!-- Einzellast F am Ende -->
+    <path d="M480 50v90" stroke-width="3"/>
+    <!-- Bemaßung l -->
+    <path d="M110 205h370M110 197v16M480 197v16" stroke-width="2"/>
+  </g>
+  <path d="M480 146l-9-18h18z" fill="#111"/>
+  <g fill="#111" font-size="26" font-style="italic">
+    <text x="494" y="72">F</text>
+    <text x="295" y="236" text-anchor="middle">l</text>
+  </g>
+</svg>

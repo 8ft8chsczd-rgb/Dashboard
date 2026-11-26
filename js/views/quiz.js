@@ -1,17 +1,32 @@
-import { getSubject, getPrefs, setPrefs, getQuizStats, saveQuizResult } from '../store.js';
-import { esc, fmt, icons, navbar, shuffle, notFound, observeLargeTitle, segmented } from '../ui.js';
+import {
+  getSubject, getPrefs, setPrefs, getQuizStats, saveQuizResult, getChapterSelection, inSelection, chapterSummary,
+} from '../store.js';
+import {
+  esc, fmt, icons, navbar, shuffle, notFound, observeLargeTitle, segmented, figureHtml,
+} from '../ui.js';
+import { openChapterSheet } from '../chapters.js';
 
 const LETTERS = 'ABCDEFGHIJ';
 const RING_C = 2 * Math.PI * 52;
 
+// Nur Karten mit Text auf der Rückseite taugen als Multiple-Choice-Frage.
+function answerCards(s) {
+  const withBack = s.cards.filter((c) => c.back.trim());
+  return new Set(withBack.map((c) => c.back.trim())).size >= 2 ? withBack : [];
+}
+
+export function cardQuestionCount(s, sel) {
+  return answerCards(s).filter((c) => inSelection(c, sel)).length;
+}
+
 // Aus jeder Karteikarte wird eine Multiple-Choice-Frage: Vorderseite = Frage,
-// Rückseite = richtige Antwort, falsche Antworten = Rückseiten anderer Karten.
-function cardQuestions(s) {
-  const distinct = new Set(s.cards.map((c) => c.back.trim()));
-  if (distinct.size < 2) return [];
-  return s.cards.map((c) => {
+// Rückseite = richtige Antwort, falsche Antworten = Rückseiten anderer Karten
+// (bevorzugt aus demselben Kapitel).
+function cardQuestions(s, sel) {
+  const all = answerCards(s);
+  return all.filter((c) => inSelection(c, sel)).map((c) => {
     const own = c.back.trim();
-    const pool = shuffle(s.cards.filter((o) => o.back.trim() !== own));
+    const pool = shuffle(all.filter((o) => o.back.trim() !== own));
     if (c.topic) pool.sort((a, b) => Number(b.topic === c.topic) - Number(a.topic === c.topic));
     const wrong = [];
     for (const o of pool) {
@@ -21,7 +36,7 @@ function cardQuestions(s) {
     }
     const options = shuffle([own, ...wrong]);
     return {
-      id: `card:${c.id}`, kind: 'card', question: c.front, image: c.frontImage,
+      id: `card:${c.id}`, kind: 'card', question: c.front, image: c.frontImage, invert: c.invert, topic: c.topic,
       options, correct: [options.indexOf(own)], explanation: '', shuffle: false,
     };
   });
@@ -39,14 +54,20 @@ export async function renderQuiz(el, id) {
   if (!s) return notFound(el);
 
   const back = { href: `#/fach/${encodeURIComponent(s.id)}`, label: s.name };
-  const nQuiz = s.quiz.length;
-  const nCards = new Set(s.cards.map((c) => c.back.trim())).size >= 2 ? s.cards.length : 0;
+  const hasChapters = s.chapters.length > 1;
+  let sel = getChapterSelection(s);
   const prefs = getPrefs(s.id);
-
   let source = ['all', 'quiz', 'cards'].includes(prefs.quizSource) ? prefs.quizSource : 'all';
-  if (!nQuiz) source = 'cards';
-  if (!nCards) source = 'quiz';
   let count = prefs.quizCount ?? 10;
+
+  const nQuiz = () => s.quiz.filter((x) => inSelection(x, sel)).length;
+  const nCards = () => cardQuestionCount(s, sel);
+  // Gewählte Quelle, falls es dafür Fragen gibt – sonst die vorhandene
+  function effSource() {
+    if (!nQuiz()) return 'cards';
+    if (!nCards()) return 'quiz';
+    return source;
+  }
 
   let state = 'setup';
   let qs = [];
@@ -57,7 +78,7 @@ export async function renderQuiz(el, id) {
   let isRetry = false;
   let stopObserver = () => {};
 
-  const available = (src) => (src === 'quiz' ? nQuiz : src === 'cards' ? nCards : nQuiz + nCards);
+  const available = (src) => (src === 'quiz' ? nQuiz() : src === 'cards' ? nCards() : nQuiz() + nCards());
 
   function setView(html, { large = false, title = 'Quiz' } = {}) {
     stopObserver();
@@ -69,21 +90,31 @@ export async function renderQuiz(el, id) {
 
   function drawSetup() {
     state = 'setup';
-    const avail = available(source);
+    const src = effSource();
+    const avail = available(src);
+    const qN = nQuiz();
+    const cN = nCards();
     const stats = getQuizStats(s.id);
+    const chapterRow = hasChapters
+      ? `<button type="button" class="group-row link-row" data-act="chapters">
+          <span class="row-label">Kapitel</span>
+          <span class="row-value">${esc(chapterSummary(s, sel))}</span>${icons.chevronRight}
+        </button>`
+      : '';
 
     if (!avail) {
       setView(`<main class="page narrow"><h1 class="large-title">Quiz</h1>
+        ${chapterRow ? `<div class="group">${chapterRow}</div>` : ''}
         <div class="empty-state static"><div class="empty-icon">${icons.quiz}</div>
-        <h2>Noch keine Fragen</h2><p>Für dieses Fach gibt es noch keine Quizfragen und zu wenige Karteikarten.</p></div></main>`, { large: true });
+        <h2>Keine Fragen</h2><p>${sel ? 'In den gewählten Kapiteln gibt es keine Quizfragen und zu wenige Karteikarten.' : 'Für dieses Fach gibt es noch keine Quizfragen und zu wenige Karteikarten.'}</p></div></main>`, { large: true });
       return;
     }
 
     const counts = [5, 10, 20].filter((n) => n < avail);
     const countVal = counts.includes(count) ? count : 'all';
     const sourceInfo = [
-      nQuiz && `${nQuiz} Quizfragen`,
-      nCards && `${nCards} Fragen aus Karteikarten`,
+      qN && `${qN} Quizfragen`,
+      cN && `${cN} Fragen aus Karteikarten`,
     ].filter(Boolean).join(' und ');
 
     setView(`<main class="page narrow">
@@ -96,12 +127,13 @@ export async function renderQuiz(el, id) {
 
       <div class="group-header">Einstellungen</div>
       <div class="group">
-        ${nQuiz && nCards ? `<div class="group-row"><span class="row-label">Fragen</span>
-          ${segmented('source', [['all', 'Alle'], ['quiz', 'Quiz'], ['cards', 'Karten']], source)}</div>` : ''}
+        ${chapterRow}
+        ${qN && cN ? `<div class="group-row"><span class="row-label">Fragen</span>
+          ${segmented('source', [['all', 'Alle'], ['quiz', 'Quiz'], ['cards', 'Karten']], src)}</div>` : ''}
         <div class="group-row"><span class="row-label">Anzahl</span>
           ${segmented('count', [...counts.map((n) => [n, String(n)]), ['all', `Alle (${avail})`]], countVal)}</div>
       </div>
-      <p class="group-footer">${sourceInfo} verfügbar.${nCards ? ' Bei Fragen aus Karteikarten ist die Rückseite die richtige Antwort.' : ''}</p>
+      <p class="group-footer">${sourceInfo} verfügbar.${cN ? ' Bei Fragen aus Karteikarten ist die Rückseite die richtige Antwort.' : ''}</p>
 
       <button class="primary-btn" data-act="start">Quiz starten</button>
     </main>`, { large: true });
@@ -116,9 +148,10 @@ export async function renderQuiz(el, id) {
   }
 
   function startNew() {
+    const src = effSource();
     const pool = [];
-    if (source !== 'cards') pool.push(...s.quiz.map((x) => ({ ...x, kind: 'quiz' })));
-    if (source !== 'quiz') pool.push(...cardQuestions(s));
+    if (src !== 'cards') pool.push(...s.quiz.filter((x) => inSelection(x, sel)).map((x) => ({ ...x, kind: 'quiz' })));
+    if (src !== 'quiz') pool.push(...cardQuestions(s, sel));
     const mixed = shuffle(pool);
     start(count === 'all' ? mixed : mixed.slice(0, count));
   }
@@ -168,7 +201,7 @@ export async function renderQuiz(el, id) {
       <div class="meter quiz-meter"><span style="width:${(i / qs.length) * 100}%"></span></div>
       <section class="q-card">
         <div class="q-tag">${tag}</div>
-        ${q.image ? `<img class="card-img" src="${esc(q.image)}" alt="">` : ''}
+        ${figureHtml(q.image, { invert: q.invert, cls: 'tap-zoom' })}
         <div class="q-text">${fmt(q.question)}</div>
       </section>
       <div class="options" role="group">
@@ -291,6 +324,7 @@ export async function renderQuiz(el, id) {
     if (!act || act.disabled) return;
     switch (act.dataset.act) {
       case 'start': startNew(); break;
+      case 'chapters': openChapterSheet(s, sel, (next) => { sel = next; drawSetup(); }); break;
       case 'check': if (selected.size) reveal(); break;
       case 'next': next(); break;
       case 'retry': start(results.filter((r) => !r.ok).map((r) => r.q), true); break;

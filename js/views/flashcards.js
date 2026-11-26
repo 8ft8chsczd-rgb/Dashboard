@@ -1,5 +1,10 @@
-import { getSubject, getKnown, setKnown, getPrefs, setPrefs } from '../store.js';
-import { esc, fmt, plainLength, isListy, icons, navbar, shuffle, toast, notFound, reducedMotion } from '../ui.js';
+import {
+  getSubject, getKnown, setKnown, getPrefs, setPrefs, getChapterSelection, inSelection, chapterSummary,
+} from '../store.js';
+import {
+  fmt, plainLength, isListy, icons, navbar, shuffle, toast, notFound, reducedMotion, figureHtml, zoomBtn,
+} from '../ui.js';
+import { openChapterSheet } from '../chapters.js';
 
 // Rechts = positiv (kann ich / weiter), links = zurück auf den Lernstapel.
 const LABELS = {
@@ -10,20 +15,30 @@ const LABELS = {
 function faceHtml(side) {
   const label = side === 'front' ? 'Frage' : 'Antwort';
   return `<div class="face ${side}">
-    <div class="face-head"><span class="face-label">${label}</span><span class="face-topic"></span></div>
+    <div class="face-head"><span class="face-label">${label}</span><span class="face-topic"></span><span class="face-zoom"></span></div>
     <div class="face-body"></div>
     <div class="swipe-badge good">${icons.check}<span></span></div>
     <div class="swipe-badge bad">${icons.undo}<span></span></div>
   </div>`;
 }
 
-function fillFace(body, text, image) {
+const SMALLER = { xl: 'lg', lg: 'md', md: 'sm', sm: 'sm' };
+
+// face: Kartenseite (oder die darunterliegende Karte im Stapel)
+function fillFace(face, text, image, invert, topic) {
+  const body = face.querySelector('.face-body');
+  const hasText = String(text).trim() !== '';
   const len = plainLength(text);
-  const size = len <= 36 ? 'xl' : len <= 100 ? 'lg' : len <= 240 ? 'md' : 'sm';
+  let size = len <= 36 ? 'xl' : len <= 100 ? 'lg' : len <= 240 ? 'md' : 'sm';
+  if (image && hasText) size = SMALLER[size];
   const left = isListy(text) || len > 140;
-  body.className = `face-body size-${size}${left ? ' left' : ''}`;
-  body.innerHTML = `<div class="txt">${image ? `<img class="card-img" src="${esc(image)}" alt="" draggable="false">` : ''}${fmt(text)}</div>`;
+  const imgCls = image ? (hasText ? ' with-img' : ' img-only') : '';
+  body.className = `face-body size-${size}${left ? ' left' : ''}${imgCls}`;
+  body.innerHTML = `<div class="txt">${figureHtml(image, { invert, button: false })}${hasText ? fmt(text) : ''}</div>`;
   body.scrollTop = 0;
+  face.querySelector('.face-topic').textContent = topic;
+  const zoom = face.querySelector('.face-zoom');
+  if (zoom) zoom.innerHTML = image ? zoomBtn(image, invert, 'in-head') : '';
 }
 
 export async function renderFlashcards(el, id) {
@@ -33,6 +48,9 @@ export async function renderFlashcards(el, id) {
 
   const byId = new Map(s.cards.map((c) => [c.id, c]));
   const known = new Set([...getKnown(s.id)].filter((k) => byId.has(k)));
+  const hasChapters = s.chapters.length > 1;
+  let sel = getChapterSelection(s);
+  let pool = s.cards.filter((c) => inSelection(c, sel));
   let shuffleOn = Boolean(getPrefs(s.id).shuffle);
   let mode = 'learn';
   const order = { learn: [], known: [] };
@@ -41,9 +59,10 @@ export async function renderFlashcards(el, id) {
   let busy = false;
   let history = [];
 
-  const knownOrder = () => s.cards.filter((c) => known.has(c.id)).map((c) => c.id);
+  const knownOrder = () => pool.filter((c) => known.has(c.id)).map((c) => c.id);
+  const knownInPool = () => pool.reduce((n, c) => n + (known.has(c.id) ? 1 : 0), 0);
   function buildLearn() {
-    const ids = s.cards.filter((c) => !known.has(c.id)).map((c) => c.id);
+    const ids = pool.filter((c) => !known.has(c.id)).map((c) => c.id);
     order.learn = shuffleOn ? shuffle(ids) : ids;
     pos.learn = 0;
   }
@@ -53,8 +72,10 @@ export async function renderFlashcards(el, id) {
   el.innerHTML = `${navbar({
     back: { href: `#/fach/${encodeURIComponent(s.id)}`, label: s.name },
     title: 'Karteikarten',
+    subtitle: hasChapters ? chapterSummary(s, sel) : null,
     plain: true,
-    right: `<button class="icon-btn" data-act="shuffle" aria-label="Lernstapel mischen" aria-pressed="false">${icons.shuffle}</button>
+    right: `${hasChapters ? `<button class="icon-btn" data-act="chapters" aria-label="Kapitel auswählen" aria-pressed="false">${icons.filter}</button>` : ''}
+            <button class="icon-btn" data-act="shuffle" aria-label="Lernstapel mischen" aria-pressed="false">${icons.shuffle}</button>
             <button class="icon-btn" data-act="reset" aria-label="Fortschritt zurücksetzen">${icons.reset}</button>`,
   })}
   <main class="study">
@@ -97,8 +118,8 @@ export async function renderFlashcards(el, id) {
   const empty = q('.empty-state');
   const meta = q('.card-meta');
   const actions = q('.actions');
-  const frontBody = q('.face.front .face-body');
-  const backBody = q('.face.back .face-body');
+  const frontFace = q('.face.front');
+  const backFace = q('.face.back');
   const peek = q('.layer.l1');
 
   const currentCard = () => {
@@ -131,13 +152,15 @@ export async function renderFlashcards(el, id) {
   }
 
   function emptyHtml() {
-    if (!s.cards.length) {
+    if (!pool.length) {
       return `<div class="empty-icon">${icons.cards}</div><h2>Keine Karteikarten</h2>
-        <p>Für dieses Fach sind noch keine Karten hinterlegt.</p>`;
+        <p>${s.cards.length ? 'In den gewählten Kapiteln gibt es keine Karten.' : 'Für dieses Fach sind noch keine Karten hinterlegt.'}</p>
+        ${hasChapters && sel ? '<div class="empty-actions"><button class="btn tinted" data-act="chapters">Kapitel auswählen</button></div>' : ''}`;
     }
     if (mode === 'learn') {
+      const where = sel ? (sel.length === 1 ? ' in diesem Kapitel' : ' in den gewählten Kapiteln') : '';
       return `<div class="empty-icon done">${icons.checkCircle}</div><h2>Alles gekonnt!</h2>
-        <p>Alle ${s.cards.length} Karten liegen auf dem Gekonnt-Stapel.</p>
+        <p>Alle ${pool.length} Karten${where} liegen auf dem Gekonnt-Stapel.</p>
         <div class="empty-actions">
           <button class="btn tinted" data-mode="known">Gekonnt-Stapel ansehen</button>
           <button class="btn plain" data-act="reset">Alle wieder lernen</button>
@@ -151,16 +174,21 @@ export async function renderFlashcards(el, id) {
   function render() {
     const list = order[mode];
     if (pos[mode] >= list.length) pos[mode] = 0;
-    const total = s.cards.length;
+    const total = pool.length;
+    const done = knownInPool();
 
     q('[data-count="learn"]').textContent = order.learn.length;
     q('[data-count="known"]').textContent = order.known.length;
     const seg = q('.segmented');
     seg.style.setProperty('--i', mode === 'learn' ? 0 : 1);
     seg.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
-    q('.progress-row .meter > span').style.width = `${total ? (known.size / total) * 100 : 0}%`;
-    q('.progress-label').textContent = `${known.size} von ${total} gekonnt`;
+    q('.progress-row .meter > span').style.width = `${total ? (done / total) * 100 : 0}%`;
+    q('.progress-label').textContent = `${done} von ${total} gekonnt`;
     q('[data-act="shuffle"]').setAttribute('aria-pressed', String(shuffleOn));
+    if (hasChapters) {
+      q('[data-act="chapters"]').setAttribute('aria-pressed', String(Boolean(sel)));
+      q('.nav-subtitle').textContent = chapterSummary(s, sel);
+    }
 
     const c = currentCard();
     deck.hidden = !c;
@@ -169,15 +197,11 @@ export async function renderFlashcards(el, id) {
     empty.hidden = Boolean(c);
 
     if (c) {
-      fillFace(frontBody, c.front, c.frontImage);
-      fillFace(backBody, c.back, c.backImage);
-      el.querySelectorAll('.flipper .face-topic').forEach((t) => { t.textContent = c.topic; });
+      fillFace(frontFace, c.front, c.frontImage, c.invert, c.topic);
+      fillFace(backFace, c.back, c.backImage, c.invert, c.topic);
       // Nächste Karte liegt sichtbar darunter (sieht man beim Wischen)
       const next = list.length > 1 ? byId.get(list[(pos[mode] + 1) % list.length]) : null;
-      if (next) {
-        fillFace(peek.querySelector('.face-body'), next.front, next.frontImage);
-        peek.querySelector('.face-topic').textContent = next.topic;
-      }
+      if (next) fillFace(peek, next.front, next.frontImage, next.invert, next.topic);
       el.querySelectorAll('.swipe-badge.good span').forEach((b) => { b.textContent = LABELS[mode].good; });
       el.querySelectorAll('.swipe-badge.bad span').forEach((b) => { b.textContent = LABELS[mode].bad; });
       deck.dataset.depth = String(Math.min(list.length - 1, 2));
@@ -333,9 +357,10 @@ export async function renderFlashcards(el, id) {
 
   function reset() {
     if (busy) return;
-    if (!known.size) { toast('Es liegen noch keine Karten auf dem Gekonnt-Stapel'); return; }
-    if (!window.confirm(`Fortschritt für „${s.name}“ zurücksetzen?\nAlle Karten kommen zurück auf den Lernstapel.`)) return;
-    known.clear();
+    if (!knownInPool()) { toast('Es liegen noch keine Karten auf dem Gekonnt-Stapel'); return; }
+    const scope = sel ? `„${chapterSummary(s, sel)}“` : `„${s.name}“`;
+    if (!window.confirm(`Fortschritt für ${scope} zurücksetzen?\nDie Karten kommen zurück auf den Lernstapel.`)) return;
+    for (const c of pool) known.delete(c.id);
     persist();
     order.known = [];
     buildLearn();
@@ -347,6 +372,23 @@ export async function renderFlashcards(el, id) {
     toast('Fortschritt zurückgesetzt');
   }
 
+  function chooseChapters() {
+    if (busy) return;
+    openChapterSheet(s, sel, (next) => {
+      sel = next;
+      pool = s.cards.filter((c) => inSelection(c, sel));
+      buildLearn();
+      order.known = knownOrder();
+      pos.known = 0;
+      history = [];
+      card.style.transform = '';
+      setSwipe(0);
+      resetFlip();
+      render();
+      enter(0);
+    });
+  }
+
   // ---------- Eingaben ----------
 
   el.addEventListener('click', (e) => {
@@ -355,13 +397,14 @@ export async function renderFlashcards(el, id) {
     if (e.detail > 0) t.blur(); // nach Tippen/Klicken keinen Fokus behalten (Leertaste = umdrehen)
     if (t.dataset.mode) { setMode(t.dataset.mode); return; }
     ({
-      know, again, undo, relearn, next: nextKnown, shuffle: toggleShuffle, reset,
+      know, again, undo, relearn, next: nextKnown, shuffle: toggleShuffle, reset, chapters: chooseChapters,
     })[t.dataset.act]?.();
   });
 
   let drag = null;
   card.addEventListener('pointerdown', (e) => {
     if (busy || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (e.target.closest('.zoom-btn')) return; // Lupe: Bild vergrößern statt umdrehen
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, active: false };
   });
   card.addEventListener('pointermove', (e) => {
