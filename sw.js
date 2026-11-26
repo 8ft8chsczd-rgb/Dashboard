@@ -1,7 +1,7 @@
 // Service Worker: macht die App offline nutzbar.
 // Strategie "Netz zuerst": Online gibt es immer die neuesten Inhalte, offline den Cache.
 // Bei Änderungen an der App die Versionsnummer erhöhen.
-const CACHE = 'lernen-v2';
+const CACHE = 'lernen-v3';
 
 const SHELL = [
   './',
@@ -87,7 +87,9 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const res = await Promise.race([fetch(req), timeout(5000)]);
+      // Beim Server nachfragen, ob es eine neue Version gibt (sonst bis zu 10 Min. alter Browser-Cache)
+      const net = req.mode === 'navigate' ? fetch(req) : fetch(req.url, { cache: 'no-cache' });
+      const res = await Promise.race([net, timeout(5000)]);
       if (res.ok) cache.put(req, res.clone());
       return res;
     } catch {
