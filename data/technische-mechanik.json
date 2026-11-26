@@ -1,0 +1,100 @@
+{
+  "id": "technische-mechanik",
+  "name": "Technische Mechanik",
+  "icon": "📐",
+  "color": "blau",
+  "description": "Beispielinhalte – werden durch deine eigenen Karten ersetzt.",
+  "cards": [
+    {
+      "front": "Welche drei Gleichgewichtsbedingungen gelten für ein ebenes System?",
+      "back": "- ΣF_{x} = 0 (Summe aller Horizontalkräfte)\n- ΣF_{z} = 0 (Summe aller Vertikalkräfte)\n- ΣM = 0 (Summe aller Momente um einen beliebigen Punkt)",
+      "topic": "Statik"
+    },
+    {
+      "front": "Festlager",
+      "back": "Verhindert Verschiebungen in **beide** Richtungen, lässt aber eine Verdrehung zu.\n\n2 Lagerreaktionen: eine horizontale und eine vertikale Kraft, kein Moment.",
+      "topic": "Lager"
+    },
+    {
+      "front": "Loslager",
+      "back": "Verhindert nur die Verschiebung senkrecht zur Gleitebene.\n\n1 Lagerreaktion: eine Kraft senkrecht zur Gleitebene.",
+      "topic": "Lager"
+    },
+    {
+      "front": "Feste Einspannung",
+      "back": "Verhindert alle Verschiebungen **und** die Verdrehung.\n\n3 Lagerreaktionen: zwei Kräfte und ein Moment.",
+      "topic": "Lager"
+    },
+    {
+      "front": "Abzählkriterium für ebene Tragwerke",
+      "back": "n = a + z − 3·s\n\n- a: Anzahl der Auflagerreaktionen\n- z: Anzahl der Zwischenreaktionen (z. B. Gelenkkräfte)\n- s: Anzahl der Scheiben\n\nn = 0 ist **notwendig** für statische Bestimmtheit, aber nicht hinreichend.",
+      "topic": "Statik"
+    },
+    {
+      "front": "Maximales Feldmoment eines Einfeldträgers unter Gleichstreckenlast q",
+      "back": "M_{max} = q · l^2 / 8\n\nEs tritt in Feldmitte auf.",
+      "topic": "Schnittgrößen"
+    },
+    {
+      "front": "Auflagerkräfte eines Einfeldträgers unter Gleichstreckenlast q",
+      "back": "A = B = q · l / 2",
+      "topic": "Schnittgrößen"
+    },
+    {
+      "front": "Zusammenhang zwischen Streckenlast, Querkraft und Biegemoment",
+      "back": "- dV/dx = −q\n- dM/dx = V\n\nWo die Querkraft null ist, hat das Biegemoment ein Extremum.",
+      "topic": "Schnittgrößen"
+    },
+    {
+      "front": "Hookesches Gesetz (einachsig)",
+      "back": "σ = E · ε\n\n- σ: Spannung\n- E: Elastizitätsmodul\n- ε: Dehnung",
+      "topic": "Festigkeitslehre"
+    },
+    {
+      "front": "Flächenträgheitsmoment eines Rechteckquerschnitts",
+      "back": "I_{y} = b · h^3 / 12\n\nWiderstandsmoment: W_{y} = b · h^2 / 6",
+      "topic": "Festigkeitslehre"
+    }
+  ],
+  "quiz": [
+    {
+      "question": "Wie viele Lagerreaktionen hat eine feste Einspannung in der Ebene?",
+      "options": ["1", "2", "3", "4"],
+      "correct": "C",
+      "explanation": "Eine Einspannung verhindert beide Verschiebungen und die Verdrehung, also zwei Kräfte und ein Moment.",
+      "topic": "Lager"
+    },
+    {
+      "question": "Wie groß ist das maximale Biegemoment eines Einfeldträgers unter Gleichstreckenlast q?",
+      "options": ["q · l^2 / 2", "q · l^2 / 8", "q · l / 4", "q · l^2 / 12"],
+      "correct": "B",
+      "explanation": "M_{max} = q · l^2 / 8 in Feldmitte. q · l^2 / 12 ist das Einspannmoment eines beidseitig eingespannten Trägers.",
+      "topic": "Schnittgrößen"
+    },
+    {
+      "question": "Welche Aussagen zum Loslager sind richtig?",
+      "options": [
+        "Es nimmt genau eine Kraft auf.",
+        "Es nimmt ein Moment auf.",
+        "Es lässt eine Verschiebung parallel zur Gleitebene zu.",
+        "Es verhindert jede Verdrehung."
+      ],
+      "correct": ["A", "C"],
+      "explanation": "Das Loslager überträgt nur eine Kraft senkrecht zur Gleitebene und lässt Verschiebung entlang der Gleitebene sowie Verdrehung zu.",
+      "topic": "Lager"
+    },
+    {
+      "question": "Welche Formel beschreibt das Widerstandsmoment W_{y} eines Rechteckquerschnitts?",
+      "options": ["b · h^2 / 6", "b · h^3 / 12", "b^3 · h / 12", "b · h / 2"],
+      "correct": "A",
+      "explanation": "W_{y} = I_{y} / (h/2) = b · h^2 / 6.",
+      "topic": "Festigkeitslehre"
+    },
+    {
+      "question": "Ein ebenes Tragwerk mit n = a + z − 3·s = 0 ist immer statisch bestimmt.",
+      "correct": false,
+      "explanation": "Das Abzählkriterium ist nur notwendig. Zusätzlich muss das System unverschieblich sein (Ausnahmefall der Statik prüfen).",
+      "topic": "Statik"
+    }
+  ]
+}
