@@ -1,29 +1,22 @@
 import { loadSubjects, loadErrors, countKnown } from '../store.js';
-import { esc, icons, navbar, observeLargeTitle } from '../ui.js';
-
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
-}
+import { esc, icons, navbar, observeLargeTitle, progressColor } from '../ui.js';
 
 function tile(s) {
   const total = s.cards.length;
   const known = countKnown(s);
   const pct = total ? Math.round((known / total) * 100) : 0;
-  const meta = [
-    total && plural(total, 'Karte', 'Karten'),
-    s.quiz.length && plural(s.quiz.length, 'Quizfrage', 'Quizfragen'),
-  ].filter(Boolean).join(' · ') || 'Noch keine Inhalte';
+  const empty = !total && !s.quiz.length;
 
   return `<a class="subject-tile" href="#/fach/${encodeURIComponent(s.id)}" style="--accent:${s.color}">
     <span class="app-icon" aria-hidden="true">${esc(s.icon)}</span>
     <span class="tile-text">
       <span class="tile-name">${esc(s.name)}</span>
-      <span class="tile-meta">${meta}</span>
+      ${empty ? '<span class="tile-meta">Noch keine Inhalte</span>' : ''}
     </span>
     ${icons.chevronRight}
     ${total ? `<span class="tile-progress">
-      <span class="meter" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></span>
-      <span class="tile-foot">${known} von ${total} gekonnt</span>
+      <span class="meter" role="progressbar" aria-label="Gelernt" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%;background:${progressColor(pct / 100)}"></span></span>
+      <span class="tile-foot">${pct} %</span>
     </span>` : ''}
   </a>`;
 }

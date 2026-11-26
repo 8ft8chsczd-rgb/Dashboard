@@ -1,7 +1,7 @@
 // Service Worker: macht die App offline nutzbar.
 // Strategie "Netz zuerst": Online gibt es immer die neuesten Inhalte, offline den Cache.
 // Bei Änderungen an der App die Versionsnummer erhöhen.
-const CACHE = 'lernen-v4';
+const CACHE = 'lernen-v5';
 
 const SHELL = [
   './',

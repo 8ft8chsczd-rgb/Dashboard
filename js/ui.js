@@ -85,6 +85,24 @@ export const icons = {
   filter: svg('<path d="M4 7h16M7 12h10M10 17h4"/>'),
 };
 
+// Fortschrittsfarbe: wenig = rot, über orange und gelb zu grün (iOS-Systemfarben)
+const PROGRESS_STOPS = [
+  [0, [255, 69, 58]],
+  [0.35, [255, 159, 10]],
+  [0.65, [255, 214, 10]],
+  [1, [48, 209, 88]],
+];
+export function progressColor(p) {
+  const x = Math.min(1, Math.max(0, p));
+  let i = 1;
+  while (i < PROGRESS_STOPS.length - 1 && x > PROGRESS_STOPS[i][0]) i += 1;
+  const [p0, c0] = PROGRESS_STOPS[i - 1];
+  const [p1, c1] = PROGRESS_STOPS[i];
+  const t = (x - p0) / (p1 - p0);
+  const rgb = c0.map((v, k) => Math.round(v + (c1[k] - v) * t));
+  return `rgb(${rgb.join(', ')})`;
+}
+
 // Kleiner Fortschrittsring (z. B. pro Kapitel)
 export function miniRing(done, total) {
   const c = 2 * Math.PI * 8;
@@ -126,16 +144,21 @@ export function navbar({ back, title = '', subtitle = null, right = '', large = 
 }
 
 // Blendet den kleinen Titel in der Leiste ein, sobald der große Titel hochgescrollt ist.
+// Gemessen an der echten Leistenhöhe (die je nach Gerät/Statusleiste unterschiedlich ist).
 export function observeLargeTitle(view) {
   const title = view.querySelector('.large-title');
   const bar = view.querySelector('.navbar');
-  if (!title || !bar || !('IntersectionObserver' in window)) return () => {};
-  const io = new IntersectionObserver(
-    ([entry]) => bar.classList.toggle('scrolled', !entry.isIntersecting),
-    { rootMargin: '-90px 0px 0px 0px' },
-  );
-  io.observe(title);
-  return () => io.disconnect();
+  if (!title || !bar) return () => {};
+  const update = () => {
+    bar.classList.toggle('scrolled', title.getBoundingClientRect().bottom <= bar.getBoundingClientRect().bottom);
+  };
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update);
+  requestAnimationFrame(update);
+  return () => {
+    window.removeEventListener('scroll', update);
+    window.removeEventListener('resize', update);
+  };
 }
 
 // Segmented Control (iOS). options: [[wert, labelHtml], ...]
